@@ -1,8 +1,10 @@
 use crate::{error::Result, map_io_err};
 use std::io;
 
+type Backend = tui::backend::CrosstermBackend<io::Stdout>;
+
 pub struct Window {
-    terminal: tui::terminal::Terminal<tui::backend::CrosstermBackend<io::Stdout>>,
+    terminal: tui::terminal::Terminal<Backend>,
 }
 
 impl Window {
@@ -14,22 +16,10 @@ impl Window {
             crossterm::terminal::EnterAlternateScreen,
             crossterm::event::EnableMouseCapture
         ))?;
-        let backend = tui::backend::CrosstermBackend::new(stdout);
+        let backend = Backend::new(stdout);
         Ok(Self {
             terminal: map_io_err!(tui::Terminal::new(backend))?,
         })
-    }
-
-    pub fn test(&mut self) -> Result<()> {
-        map_io_err!(self.terminal.draw(|f| {
-            let size = f.size();
-            let block = tui::widgets::Block::default()
-                .title("Block")
-                .borders(tui::widgets::Borders::ALL);
-            f.render_widget(block, size);
-        }))?;
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-        Ok(())
     }
 
     pub fn close(mut self) -> Result<()> {
@@ -41,5 +31,12 @@ impl Window {
         ))?;
         map_io_err!(self.terminal.show_cursor())?;
         Ok(())
+    }
+
+    pub fn draw<F>(&mut self, f: F) -> Result<tui::terminal::CompletedFrame>
+    where
+        F: FnOnce(&mut tui::Frame<Backend>),
+    {
+        map_io_err!(self.terminal.draw(f))
     }
 }

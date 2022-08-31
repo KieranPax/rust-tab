@@ -8,7 +8,5 @@ mod window;
 use error::Result;
 
 fn main() -> Result<()> {
-    let mut win = window::Window::new()?;
-    win.test()?;
-    win.close()
+    app::App::new()?.run()
 }
