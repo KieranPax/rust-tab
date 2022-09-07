@@ -48,7 +48,7 @@ impl Window {
         self.queue(style::PrintStyledContent(color.stylize(text)))
     }
 
-    pub fn print(&mut self, text: &str) -> Result<&mut Self> {
+    pub fn print<T: std::fmt::Display>(&mut self, text: T) -> Result<&mut Self> {
         self.queue(style::Print(text))
     }
 

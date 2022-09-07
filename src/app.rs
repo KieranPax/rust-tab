@@ -1,10 +1,9 @@
-use core::fmt;
-
 use crate::{
     error::{Error, Result},
     window::{self, Color},
 };
 use crossterm::event;
+use std::fmt;
 
 type BeatRange = std::ops::Range<usize>;
 
@@ -18,6 +17,19 @@ enum Duration {
     Eighth,
     Sixteenth,
     ThirtyTwoth,
+}
+
+impl fmt::Display for Duration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Duration::Whole => f.write_str(" "),
+            Duration::Half => f.write_str("-"),
+            Duration::Quarter => f.write_str("1"),
+            Duration::Eighth => f.write_str("2"),
+            Duration::Sixteenth => f.write_str("3"),
+            Duration::ThirtyTwoth => f.write_str("4"),
+        }
+    }
 }
 
 struct Beat {
@@ -123,10 +135,12 @@ impl App {
     }
 
     fn draw_durations(&self, win: &mut window::Window, range: BeatRange) -> Result<()> {
+        let track = self.track();
         win.moveto(0, 0)?;
-        for _ in range {
-            win.print("+ - ")?;
+        for i in range {
+            win.print(format!("+ {} ", track.beats[i].dur))?;
         }
+        win.print("+")?;
         Ok(())
     }
 
@@ -147,6 +161,7 @@ impl App {
                 win.print("|   ")?;
             }
         }
+        win.print("|")?;
         Ok(())
     }
 
@@ -174,7 +189,7 @@ impl App {
         }
         win.moveto(0, track.string_count + 2)?
             .clear_line()?
-            .print(self.gen_status_msg().as_str())?
+            .print(self.gen_status_msg())?
             .update()?;
         Ok(track.string_count + 3)
     }
