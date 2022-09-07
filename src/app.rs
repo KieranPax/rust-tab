@@ -205,6 +205,19 @@ impl App {
                 Some(_) => Err(Error::UnknownCmd(s_cmd)),
                 None => Err(Error::MalformedCmd(s_cmd)),
             },
+            "b" => match cmd.get(1) {
+                Some(&"split") => {
+                    let split: u8 = match cmd.get(2) {
+                        None => 2,
+                        Some(s) => s.parse().map_err(|_| {
+                            Error::MalformedCmd(format!("Cannot parse {} as u8", s))
+                        })?,
+                    };
+                    Ok(format!("split beat {split}"))
+                }
+                Some(_) => Err(Error::UnknownCmd(s_cmd)),
+                None => Err(Error::MalformedCmd(s_cmd)),
+            },
             _ => Err(Error::UnknownCmd(s_cmd)),
         }
     }
