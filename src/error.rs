@@ -2,7 +2,8 @@
 pub enum Error {
     IOError(std::io::Error),
     NoEvent,
-    Unspecified,
+    MalformedCmd(String),
+    UnknownCmd(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
 

@@ -37,6 +37,7 @@ struct Song {
     tracks: Vec<Track>,
 }
 
+#[derive(Clone)]
 enum Typing {
     None,
     Command(String),
@@ -192,19 +193,36 @@ impl App {
         });
     }
 
-    fn process_typing(&mut self) -> Result<()> {
-        self.typing_res = match &self.typing {
-            Typing::Command(s) => match s.as_str() {
-                "t add" => {
+    fn process_command(&mut self, s_cmd: String) -> Result<String> {
+        let cmd: Vec<_> = s_cmd.split(' ').collect();
+        match cmd[0] {
+            "" => Ok(String::new()),
+            "t" => match cmd.get(1) {
+                Some(&"add") => {
                     self.add_track();
-                    format!("added track {}", self.song.tracks.len() - 1)
+                    Ok(format!("Added track [{}]", self.song.tracks.len() - 1))
                 }
-                _ => "unrecognised".into(),
+                Some(_) => Err(Error::UnknownCmd(s_cmd)),
+                None => Err(Error::MalformedCmd(s_cmd)),
             },
-            Typing::None => return Err(Error::Unspecified),
+            _ => Err(Error::UnknownCmd(s_cmd)),
+        }
+    }
+
+    fn process_typing(&mut self) -> Result<()> {
+        let res = match self.typing.clone() {
+            Typing::Command(s) => self.process_command(s),
+            Typing::None => panic!("App.typing hasn't been initiated"),
         };
-        self.typing = Typing::None;
-        Ok(())
+        if let Err(e) = res {
+            self.typing = Typing::None;
+            self.typing_res = format!("{e:?}");
+            Ok(())
+        } else {
+            self.typing = Typing::None;
+            self.typing_res = res.unwrap();
+            Ok(())
+        }
     }
 
     fn key_press(&mut self, key: event::KeyCode) {
@@ -259,6 +277,7 @@ impl App {
             }
             do_redraw = self.proc_event(&mut win)?;
         }
+        win.clear()?.update()?;
         Ok(())
     }
 }
