@@ -1,6 +1,7 @@
 #[derive(Debug)]
 pub enum Error {
     IOError(std::io::Error),
+    NoEvent,
     Unspecified,
 }
 pub type Result<T> = std::result::Result<T, Error>;

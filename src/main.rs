@@ -1,5 +1,4 @@
 extern crate crossterm;
-extern crate tui;
 mod app;
 mod error;
 mod tab;

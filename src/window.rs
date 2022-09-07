@@ -1,42 +1,78 @@
-use crate::{error::Result, map_io_err};
-use std::io;
+use crate::{
+    error::{Error, Result},
+    map_io_err,
+};
+use crossterm::{
+    event,
+    style::{self, Stylize},
+    terminal,
+};
 
-type Backend = tui::backend::CrosstermBackend<io::Stdout>;
+#[allow(unused)]
+pub enum Color {
+    Magenta,
+    WhiteBG,
+    GreyBG,
+}
+
+impl Color {
+    pub fn stylize<'a>(&self, text: &'a str) -> style::StyledContent<&'a str> {
+        match self {
+            Self::Magenta => Stylize::magenta(text),
+            Self::WhiteBG => Stylize::on_white(text).black(),
+            Self::GreyBG => Stylize::on_dark_grey(text),
+        }
+    }
+}
 
 pub struct Window {
-    terminal: tui::terminal::Terminal<Backend>,
+    stdout: std::io::Stdout,
 }
 
 impl Window {
     pub fn new() -> Result<Self> {
-        map_io_err!(crossterm::terminal::enable_raw_mode())?;
-        let mut stdout = io::stdout();
-        map_io_err!(crossterm::execute!(
-            stdout,
-            crossterm::terminal::EnterAlternateScreen,
-            crossterm::event::EnableMouseCapture
-        ))?;
-        let backend = Backend::new(stdout);
         Ok(Self {
-            terminal: map_io_err!(tui::Terminal::new(backend))?,
+            stdout: std::io::stdout(),
         })
     }
 
-    pub fn close(mut self) -> Result<()> {
-        map_io_err!(crossterm::terminal::disable_raw_mode())?;
-        map_io_err!(crossterm::execute!(
-            self.terminal.backend_mut(),
-            crossterm::terminal::LeaveAlternateScreen,
-            crossterm::event::DisableMouseCapture
-        ))?;
-        map_io_err!(self.terminal.show_cursor())?;
-        Ok(())
+    pub fn moveto(&mut self, x: u16, y: u16) -> Result<&mut Self> {
+        self.queue(crossterm::cursor::MoveTo(x, y))
     }
 
-    pub fn draw<F>(&mut self, f: F) -> Result<tui::terminal::CompletedFrame>
+    pub fn print_color(&mut self, text: &str, color: Color) -> Result<&mut Self> {
+        self.queue(style::PrintStyledContent(color.stylize(text)))
+    }
+
+    pub fn print(&mut self, text: &str) -> Result<&mut Self> {
+        self.queue(style::Print(text))
+    }
+
+    pub fn clear(&mut self) -> Result<&mut Self> {
+        self.queue(terminal::Clear(terminal::ClearType::All))
+    }
+
+    pub fn queue<C>(&mut self, command: C) -> Result<&mut Self>
     where
-        F: FnOnce(&mut tui::Frame<Backend>),
+        C: crossterm::Command,
     {
-        map_io_err!(self.terminal.draw(f))
+        map_io_err!(crossterm::QueueableCommand::queue(
+            &mut self.stdout,
+            command
+        ))?;
+        Ok(self)
+    }
+
+    pub fn update(&mut self) -> Result<()> {
+        map_io_err!(std::io::Write::flush(&mut self.stdout))
+    }
+
+    pub fn get_event(&mut self) -> Result<event::Event> {
+        let poll = map_io_err!(event::poll(std::time::Duration::from_millis(100)))?;
+        if poll {
+            map_io_err!(event::read())
+        } else {
+            Err(Error::NoEvent)
+        }
     }
 }
