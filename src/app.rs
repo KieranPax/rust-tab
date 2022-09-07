@@ -9,7 +9,7 @@ type BeatRange = std::ops::Range<usize>;
 
 struct Note {}
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Duration {
     Whole,
     Half,
@@ -17,6 +17,19 @@ enum Duration {
     Eighth,
     Sixteenth,
     ThirtyTwoth,
+}
+
+impl Duration {
+    fn split(&self) -> Result<Self> {
+        match self {
+            Self::Whole => Ok(Self::Half),
+            Self::Half => Ok(Self::Quarter),
+            Self::Quarter => Ok(Self::Eighth),
+            Self::Eighth => Ok(Self::Sixteenth),
+            Self::Sixteenth => Ok(Self::ThirtyTwoth),
+            _ => Err(Error::InvalidOp(format!("Cannot split duration ({self:?})"))),
+        }
+    }
 }
 
 impl fmt::Display for Duration {
@@ -37,6 +50,10 @@ struct Beat {
 }
 
 impl Beat {
+    fn new(dur: Duration) -> Self {
+        Self { dur }
+    }
+
     fn copy_duration(&self) -> Self {
         Self { dur: self.dur }
     }
@@ -99,18 +116,10 @@ impl App {
             tracks: vec![Track {
                 string_count: 6,
                 beats: vec![
-                    Beat {
-                        dur: Duration::Quarter,
-                    },
-                    Beat {
-                        dur: Duration::Quarter,
-                    },
-                    Beat {
-                        dur: Duration::Quarter,
-                    },
-                    Beat {
-                        dur: Duration::Quarter,
-                    },
+                    Beat::new(Duration::Quarter),
+                    Beat::new(Duration::Quarter),
+                    Beat::new(Duration::Quarter),
+                    Beat::new(Duration::Quarter),
                 ],
             }],
         };
@@ -231,13 +240,12 @@ impl App {
             },
             "b" => match cmd.get(1) {
                 Some(&"split") => {
-                    let split: u8 = match cmd.get(2) {
-                        None => 2,
-                        Some(s) => s.parse().map_err(|_| {
-                            Error::MalformedCmd(format!("Cannot parse {} as u8", s))
-                        })?,
-                    };
-                    Ok(format!("split beat {split}"))
+                    let index = self.sel_beat;
+                    let track = self.track_mut();
+                    let s_dur = track.beats[index].dur.split()?;
+                    track.beats[index].dur = s_dur;
+                    track.beats.insert(index, Beat::new(s_dur));
+                    Ok(format!("Split beat[{index}] into {s_dur:?}"))
                 }
                 Some(_) => Err(Error::UnknownCmd(s_cmd)),
                 None => Err(Error::MalformedCmd(s_cmd)),

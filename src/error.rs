@@ -4,6 +4,7 @@ pub enum Error {
     NoEvent,
     MalformedCmd(String),
     UnknownCmd(String),
+    InvalidOp(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
