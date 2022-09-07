@@ -6,6 +6,8 @@ use crate::{
 };
 use crossterm::event;
 
+type BeatRange = std::ops::Range<usize>;
+
 struct Note {}
 
 #[derive(Clone, Copy)]
@@ -73,7 +75,7 @@ pub struct App {
     song: Song,
     last_cursor_y: u16,
     sel_track: usize,
-    sel_beat: u32,
+    sel_beat: usize,
     sel_string: u16,
     typing: Typing,
     typing_res: String,
@@ -120,21 +122,21 @@ impl App {
         self.song.tracks.get_mut(self.sel_track).unwrap()
     }
 
-    fn draw_durations(&self, win: &mut window::Window, max_count: u16) -> Result<()> {
+    fn draw_durations(&self, win: &mut window::Window, range: BeatRange) -> Result<()> {
         win.moveto(0, 0)?;
-        for _ in 0..max_count {
+        for _ in range {
             win.print("+ - ")?;
         }
         Ok(())
     }
 
-    fn draw_string(&self, win: &mut window::Window, string: u16, max_count: u32) -> Result<()> {
+    fn draw_string(&self, win: &mut window::Window, string: u16, range: BeatRange) -> Result<()> {
         let sel_string = self.sel_string == string;
         win.moveto(0, string + 1)?;
-        for i in 0..max_count {
-            if self.sel_beat == i {
+        for i in range {
+            if self.sel_beat as usize == i {
                 win.print("|")?.print_color(
-                    " 0 ",
+                    "   ",
                     if sel_string {
                         Color::WhiteBG
                     } else {
@@ -142,7 +144,7 @@ impl App {
                     },
                 )?;
             } else {
-                win.print("| 0 ")?;
+                win.print("|   ")?;
             }
         }
         Ok(())
@@ -156,12 +158,19 @@ impl App {
         }
     }
 
+    fn visible_beat_range(&self, max: u16) -> BeatRange {
+        let start = 0;
+        let len = (max as usize).min(self.track().beats.len());
+        start..start + len
+    }
+
     fn draw(&self, win: &mut window::Window, (w, _h): (u16, u16)) -> Result<u16> {
         let track = self.track();
         win.moveto(0, 0)?;
-        self.draw_durations(win, w / 4)?;
+        let range = self.visible_beat_range(w / 4);
+        self.draw_durations(win, range.clone())?;
         for i in 0..track.string_count {
-            self.draw_string(win, i, (w / 4) as u32)?;
+            self.draw_string(win, i, range.clone())?;
         }
         win.moveto(0, track.string_count + 2)?
             .clear_line()?
@@ -175,10 +184,10 @@ impl App {
         self.sel_string = new.clamp(0, self.track().string_count as i16 - 1) as u16;
     }
 
-    fn seek_beat(&mut self, dire: i32) {
-        let new = (self.sel_beat as i32 + dire).max(0) as u32;
+    fn seek_beat(&mut self, dire: isize) {
+        let new = (self.sel_beat as isize + dire).max(0) as usize;
         let beats = &mut self.track_mut().beats;
-        while new > beats.len() as u32 {
+        while new >= beats.len() as usize {
             beats.push(beats.last().unwrap().copy_duration());
         }
         self.sel_beat = new;
