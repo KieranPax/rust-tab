@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::{
     error::{Error, Result},
     window::{self, Color},
@@ -35,6 +37,36 @@ struct Song {
     tracks: Vec<Track>,
 }
 
+enum Typing {
+    None,
+    Command(String),
+}
+
+impl Typing {
+    fn mut_string(&mut self) -> Option<&mut String> {
+        match self {
+            Typing::None => None,
+            Typing::Command(s) => Some(s),
+        }
+    }
+
+    fn is_none(&self) -> bool {
+        match self {
+            Typing::None => true,
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for Typing {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Typing::None => Ok(()),
+            Typing::Command(text) => f.write_fmt(format_args!("cmd:{text}")),
+        }
+    }
+}
+
 pub struct App {
     should_close: bool,
     song: Song,
@@ -42,6 +74,8 @@ pub struct App {
     sel_track: usize,
     sel_beat: u32,
     sel_string: u16,
+    typing: Typing,
+    typing_res: String,
 }
 
 impl App {
@@ -72,6 +106,8 @@ impl App {
             sel_track: 0,
             sel_beat: 0,
             sel_string: 0,
+            typing: Typing::None,
+            typing_res: "".into(),
         })
     }
 
@@ -111,6 +147,14 @@ impl App {
         Ok(())
     }
 
+    fn gen_status_msg(&self) -> String {
+        if self.typing.is_none() {
+            format!("{} | {} beats", self.typing_res, self.track().beats.len())
+        } else {
+            format!("{} < {} beats", self.typing, self.track().beats.len())
+        }
+    }
+
     fn draw(&self, win: &mut window::Window, (w, _h): (u16, u16)) -> Result<u16> {
         let track = self.track();
         win.moveto(0, 0)?;
@@ -119,7 +163,8 @@ impl App {
             self.draw_string(win, i, (w / 4) as u32)?;
         }
         win.moveto(0, track.string_count + 2)?
-            .print(format!("{} beats", track.beats.len()).as_str())?
+            .clear_line()?
+            .print(self.gen_status_msg().as_str())?
             .update()?;
         Ok(track.string_count + 3)
     }
@@ -138,19 +183,61 @@ impl App {
         self.sel_beat = new;
     }
 
+    fn add_track(&mut self) {
+        self.song.tracks.push(Track {
+            beats: vec![Beat {
+                dur: Duration::Whole,
+            }],
+            string_count: 6,
+        });
+    }
+
+    fn process_typing(&mut self) -> Result<()> {
+        self.typing_res = match &self.typing {
+            Typing::Command(s) => match s.as_str() {
+                "t add" => {
+                    self.add_track();
+                    format!("added track {}", self.song.tracks.len() - 1)
+                }
+                _ => "unrecognised".into(),
+            },
+            Typing::None => return Err(Error::Unspecified),
+        };
+        self.typing = Typing::None;
+        Ok(())
+    }
+
+    fn key_press(&mut self, key: event::KeyCode) {
+        if let Some(typing) = self.typing.mut_string() {
+            match key {
+                event::KeyCode::Char(c) => typing.push(c),
+                event::KeyCode::Enter => self.process_typing().unwrap(),
+                event::KeyCode::Backspace => {
+                    typing.pop();
+                }
+                _ => {}
+            }
+        } else {
+            match key {
+                event::KeyCode::Char('q') | event::KeyCode::Esc => self.should_close = true,
+                event::KeyCode::Char('a') => self.seek_beat(-1),
+                event::KeyCode::Char('d') => self.seek_beat(1),
+                event::KeyCode::Char('w') => self.seek_string(-1),
+                event::KeyCode::Char('s') => self.seek_string(1),
+                event::KeyCode::Char(' ') => {
+                    self.typing = Typing::Command(String::with_capacity(16))
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn proc_event(&mut self, win: &mut window::Window) -> Result<bool> {
         match win.get_event() {
             Ok(e) => match e {
                 event::Event::Key(e) => match e {
                     event::KeyEvent { code, .. } => {
-                        match code {
-                            event::KeyCode::Char('q') => self.should_close = true,
-                            event::KeyCode::Char('a') => self.seek_beat(-1),
-                            event::KeyCode::Char('d') => self.seek_beat(1),
-                            event::KeyCode::Char('w') => self.seek_string(-1),
-                            event::KeyCode::Char('s') => self.seek_string(1),
-                            _ => {}
-                        };
+                        self.key_press(code);
                         Ok(true)
                     }
                 },

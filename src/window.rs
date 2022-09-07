@@ -56,6 +56,10 @@ impl Window {
         self.queue(terminal::Clear(terminal::ClearType::All))
     }
 
+    pub fn clear_line(&mut self) -> Result<&mut Self> {
+        self.queue(terminal::Clear(terminal::ClearType::CurrentLine))
+    }
+
     pub fn queue<C>(&mut self, command: C) -> Result<&mut Self>
     where
         C: crossterm::Command,
