@@ -31,9 +31,13 @@ pub struct Window {
 
 impl Window {
     pub fn new() -> Result<Self> {
-        Ok(Self {
+        let mut o = Self {
             stdout: std::io::stdout(),
-        })
+        };
+        o.queue(crossterm::cursor::Hide)?
+            .queue(crossterm::terminal::SetTitle("Tab"))?
+            .update()?;
+        Ok(o)
     }
 
     pub fn moveto(&mut self, x: u16, y: u16) -> Result<&mut Self> {
