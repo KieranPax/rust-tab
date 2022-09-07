@@ -7,7 +7,16 @@ use std::fmt;
 
 type BeatRange = std::ops::Range<usize>;
 
-struct Note {}
+struct Note {
+    string: u16,
+    fret: i32,
+}
+
+impl Note {
+    fn new(string: u16, fret: i32) -> Self {
+        Self { string, fret }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 enum Duration {
@@ -27,7 +36,9 @@ impl Duration {
             Self::Quarter => Ok(Self::Eighth),
             Self::Eighth => Ok(Self::Sixteenth),
             Self::Sixteenth => Ok(Self::ThirtyTwoth),
-            _ => Err(Error::InvalidOp(format!("Cannot split duration ({self:?})"))),
+            _ => Err(Error::InvalidOp(format!(
+                "Cannot split duration ({self:?})"
+            ))),
         }
     }
 }
@@ -47,15 +58,38 @@ impl fmt::Display for Duration {
 
 struct Beat {
     dur: Duration,
+    notes: Vec<Note>,
 }
 
 impl Beat {
     fn new(dur: Duration) -> Self {
-        Self { dur }
+        Self {
+            dur,
+            notes: Vec::new(),
+        }
     }
 
     fn copy_duration(&self) -> Self {
-        Self { dur: self.dur }
+        Self::new(self.dur)
+    }
+
+    fn get_note(&self, string: u16) -> Option<&Note> {
+        for i in self.notes.iter() {
+            if i.string == string {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    fn set_note(&mut self, string: u16, fret: i32) {
+        for i in self.notes.iter_mut() {
+            if i.string == string {
+                i.fret = fret;
+                return;
+            }
+        }
+        self.notes.push(Note::new(string, fret))
     }
 }
 
@@ -154,12 +188,18 @@ impl App {
     }
 
     fn draw_string(&self, win: &mut window::Window, string: u16, range: BeatRange) -> Result<()> {
+        let track = self.track();
         let sel_string = self.sel_string == string;
         win.moveto(0, string + 1)?;
         for i in range {
+            let inner: String = if let Some(val) = track.beats[i].get_note(string) {
+                format!("{}", val.fret)
+            } else {
+                "   ".into()
+            };
             if self.sel_beat as usize == i {
                 win.print("|")?.print_color(
-                    "   ",
+                    inner.as_str(),
                     if sel_string {
                         Color::WhiteBG
                     } else {
@@ -167,7 +207,7 @@ impl App {
                     },
                 )?;
             } else {
-                win.print("|   ")?;
+                win.print(format!("|{inner}"))?;
             }
         }
         win.print("|")?;
@@ -176,9 +216,9 @@ impl App {
 
     fn gen_status_msg(&self) -> String {
         if self.typing.is_none() {
-            format!("{} | {} beats", self.typing_res, self.track().beats.len())
+            format!("{} |", self.typing_res)
         } else {
-            format!("{} < {} beats", self.typing, self.track().beats.len())
+            format!("{} <", self.typing)
         }
     }
 
@@ -219,9 +259,7 @@ impl App {
 
     fn add_track(&mut self) {
         self.song.tracks.push(Track {
-            beats: vec![Beat {
-                dur: Duration::Whole,
-            }],
+            beats: vec![Beat::new(Duration::Whole)],
             string_count: 6,
         });
     }
@@ -248,6 +286,22 @@ impl App {
                     Ok(format!("Split beat[{index}] into {s_dur:?}"))
                 }
                 Some(_) => Err(Error::UnknownCmd(s_cmd)),
+                None => Err(Error::MalformedCmd(s_cmd)),
+            },
+            "n" => match cmd.get(1) {
+                Some(s) => {
+                    if let Ok(fret) = s.parse::<i32>() {
+                        let beat = self.sel_beat;
+                        let string = self.sel_string;
+                        self.track_mut().beats[beat].set_note(string, fret);
+                        Ok(format!(
+                            "Note count : {}",
+                            self.track_mut().beats[beat].notes.len()
+                        ))
+                    } else {
+                        Err(Error::UnknownCmd(s_cmd))
+                    }
+                }
                 None => Err(Error::MalformedCmd(s_cmd)),
             },
             _ => Err(Error::UnknownCmd(s_cmd)),
