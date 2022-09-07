@@ -48,7 +48,7 @@ impl App {
     pub fn new() -> Result<Self> {
         let song = Song {
             tracks: vec![Track {
-                string_count: 20,
+                string_count: 6,
                 beats: vec![
                     Beat {
                         dur: Duration::Quarter,
@@ -113,9 +113,7 @@ impl App {
 
     fn draw(&self, win: &mut window::Window, (w, _h): (u16, u16)) -> Result<u16> {
         let track = self.track();
-        win.queue(crossterm::terminal::ScrollUp(self.last_cursor_y))?
-            .clear()?
-            .moveto(0, 0)?;
+        win.moveto(0, 0)?;
         self.draw_durations(win, w / 4)?;
         for i in 0..track.string_count {
             self.draw_string(win, i, (w / 4) as u32)?;
@@ -149,6 +147,8 @@ impl App {
                             event::KeyCode::Char('q') => self.should_close = true,
                             event::KeyCode::Char('a') => self.seek_beat(-1),
                             event::KeyCode::Char('d') => self.seek_beat(1),
+                            event::KeyCode::Char('w') => self.seek_string(-1),
+                            event::KeyCode::Char('s') => self.seek_string(1),
                             _ => {}
                         };
                         Ok(true)
@@ -164,6 +164,7 @@ impl App {
 
     pub fn run(mut self) -> Result<()> {
         let mut win = window::Window::new()?;
+        win.clear()?;
         let mut do_redraw = true;
         while !self.should_close {
             if do_redraw {
@@ -171,6 +172,6 @@ impl App {
             }
             do_redraw = self.proc_event(&mut win)?;
         }
-        win.clear()?.update()
+        Ok(())
     }
 }
