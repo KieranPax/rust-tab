@@ -112,7 +112,7 @@ struct Song {
 enum Typing {
     None,
     Command(String),
-    NoteEdit(String),
+    Note(String),
     Copy(String),
 }
 
@@ -121,7 +121,7 @@ impl Typing {
         match self {
             Typing::None => None,
             Typing::Command(s) => Some(s),
-            Typing::NoteEdit(s) => Some(s),
+            Typing::Note(s) => Some(s),
             Typing::Copy(s) => Some(s),
         }
     }
@@ -146,7 +146,7 @@ impl fmt::Display for Typing {
         match self {
             Typing::None => Ok(()),
             Typing::Command(text) => f.write_fmt(format_args!("cmd:{text}")),
-            Typing::NoteEdit(text) => f.write_fmt(format_args!("note:{text}")),
+            Typing::Note(text) => f.write_fmt(format_args!("note:{text}")),
             Typing::Copy(text) => f.write_fmt(format_args!("copy:{text}")),
         }
     }
@@ -172,13 +172,13 @@ impl fmt::Debug for Buffer {
 
 pub struct App {
     should_close: bool,
+    song_path: Option<String>,
     song: Song,
     sel_track: usize,
     sel_beat: usize,
     sel_string: u16,
     typing: Typing,
     typing_res: String,
-    song_path: Option<String>,
     copy_buffer: Buffer,
 }
 
@@ -192,7 +192,7 @@ impl App {
             sel_beat: 0,
             sel_string: 0,
             typing: Typing::None,
-            typing_res: "".into(),
+            typing_res: String::new(),
             copy_buffer: Buffer::Empty,
         })
     }
@@ -435,7 +435,7 @@ impl App {
     fn process_typing(&mut self) -> Result<()> {
         let res = match self.typing.clone() {
             Typing::Command(s) => self.process_command(s),
-            Typing::NoteEdit(s) => self.process_note_edit(s),
+            Typing::Note(s) => self.process_note_edit(s),
             Typing::Copy(s) => self.process_copy(s),
             Typing::None => panic!("App.typing hasn't been initiated"),
         };
@@ -504,7 +504,7 @@ impl App {
                 event::KeyCode::Char('d') => self.seek_beat(1),
                 event::KeyCode::Char('w') => self.seek_string(-1),
                 event::KeyCode::Char('s') => self.seek_string(1),
-                event::KeyCode::Char('n') => self.typing = Typing::NoteEdit(String::new()),
+                event::KeyCode::Char('n') => self.typing = Typing::Note(String::new()),
                 event::KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
                 event::KeyCode::Char('v') => self.paste_once(false),
                 event::KeyCode::Char('V') => self.paste_once(true),
