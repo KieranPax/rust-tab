@@ -42,6 +42,10 @@ impl Window {
         self.queue(terminal::Clear(terminal::ClearType::CurrentLine))
     }
 
+    pub fn clear_eoline(&mut self) -> Result<&mut Self> {
+        self.queue(terminal::Clear(terminal::ClearType::UntilNewLine))
+    }
+
     pub fn queue<C>(&mut self, command: C) -> Result<&mut Self>
     where
         C: crossterm::Command,

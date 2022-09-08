@@ -229,7 +229,7 @@ impl App {
         for i in range {
             win.print(format!("~ {} ", track.beats[i].dur))?;
         }
-        win.print("~")?;
+        win.print("~")?.clear_eoline()?;
         Ok(())
     }
 
@@ -258,15 +258,15 @@ impl App {
                 win.print(inner)?;
             }
         }
-        win.print("―")?;
+        win.print("―")?.clear_eoline()?;
         Ok(())
     }
 
     fn gen_status_msg(&self) -> String {
         if self.typing.is_none() {
-            format!("{} | buffer : {:?} | {}", self.typing_res, self.copy_buffer, self.track().beats.len())
+            format!("{} | buffer : {:?}", self.typing_res, self.copy_buffer)
         } else {
-            format!("{} $ buffer : {:?} | {}", self.typing, self.copy_buffer, self.track().beats.len())
+            format!("{} $ buffer : {:?}", self.typing, self.copy_buffer)
         }
     }
 
