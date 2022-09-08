@@ -68,6 +68,22 @@ impl fmt::Display for Duration {
     }
 }
 
+impl std::str::FromStr for Duration {
+    type Err = Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "1" => Ok(Self::Whole),
+            "2" => Ok(Self::Half),
+            "4" => Ok(Self::Quarter),
+            "8" => Ok(Self::Eighth),
+            "16" => Ok(Self::Sixteenth),
+            "32" => Ok(Self::ThirtyTwoth),
+            _=> Err(Error::InvalidOp(format!("Cannot parse '{s}' as Duration")))
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 struct Beat {
     dur: Duration,
@@ -133,13 +149,14 @@ enum Typing {
     Note(String),
     Copy(String),
     Delete(String),
+    Duration(String),
 }
 
 impl Typing {
     fn mut_string(&mut self) -> Option<&mut String> {
         match self {
             Typing::None => None,
-            Typing::Command(s) | Typing::Note(s) | Typing::Copy(s) | Typing::Delete(s) => Some(s),
+            Typing::Command(s) | Typing::Note(s) | Typing::Copy(s) | Typing::Delete(s) | Typing::Duration(s) => Some(s),
         }
     }
 
@@ -166,6 +183,7 @@ impl fmt::Display for Typing {
             Typing::Note(text) => f.write_fmt(format_args!("note:{text}")),
             Typing::Copy(text) => f.write_fmt(format_args!("copy:{text}")),
             Typing::Delete(text) => f.write_fmt(format_args!("delete:{text}")),
+            Typing::Duration(text) => f.write_fmt(format_args!("duration:{text}")),
         }
     }
 }
@@ -479,12 +497,20 @@ impl App {
         }
     }
 
+    fn process_duration(&mut self, cmd: String) -> Result<String> {
+        let dur: Duration = cmd.parse()?;
+        let beat = self.sel_beat;
+        self.track_mut().beats[beat].dur = dur;
+        Ok(format!("{dur:?}"))
+    }
+
     fn process_typing(&mut self) -> Result<()> {
         let res = match self.typing.clone() {
             Typing::Command(s) => self.process_command(s),
             Typing::Note(s) => self.process_note_edit(s),
             Typing::Copy(s) => self.process_copy(s),
             Typing::Delete(s) => self.process_delete(s),
+            Typing::Duration(s) => self.process_duration(s),
             Typing::None => panic!("App.typing hasn't been initiated"),
         };
         if let Err(e) = res {
@@ -555,6 +581,7 @@ impl App {
                 event::KeyCode::Char('n') => self.typing = Typing::Note(String::new()),
                 event::KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
                 event::KeyCode::Char('x') => self.typing = Typing::Delete(String::new()),
+                event::KeyCode::Char('l') => self.typing = Typing::Duration(String::new()),
                 event::KeyCode::Char('v') => self.paste_once(false),
                 event::KeyCode::Char('V') => self.paste_once(true),
                 event::KeyCode::Char(' ') => {
