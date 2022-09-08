@@ -1,8 +1,8 @@
 use crate::{
     error::{Error, Result},
-    window::{self, Color},
+    window,
 };
-use crossterm::event;
+use crossterm::{event, style::Stylize};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -218,19 +218,16 @@ impl App {
         win.moveto(0, string + 1)?;
         for i in range {
             let inner: String = if let Some(val) = track.beats[i].get_note(string) {
-                format!("{}", val.fret)
+                format!("{: ^3}", val.fret)
             } else {
                 "   ".into()
             };
             if self.sel_beat as usize == i {
-                win.print("|")?.print_color(
-                    inner.as_str(),
-                    if sel_string {
-                        Color::WhiteBG
-                    } else {
-                        Color::GreyBG
-                    },
-                )?;
+                win.print("|")?.print_styled(if sel_string {
+                    inner.as_str().on_white().black()
+                } else {
+                    inner.as_str().on_dark_grey().black()
+                })?;
             } else {
                 win.print(format!("|{inner}"))?;
             }

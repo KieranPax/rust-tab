@@ -2,28 +2,7 @@ use crate::{
     error::{Error, Result},
     map_io_err,
 };
-use crossterm::{
-    event,
-    style::{self, Stylize},
-    terminal,
-};
-
-#[allow(unused)]
-pub enum Color {
-    Magenta,
-    WhiteBG,
-    GreyBG,
-}
-
-impl Color {
-    pub fn stylize<'a>(&self, text: &'a str) -> style::StyledContent<&'a str> {
-        match self {
-            Self::Magenta => Stylize::magenta(text),
-            Self::WhiteBG => Stylize::on_white(text).black(),
-            Self::GreyBG => Stylize::on_dark_grey(text),
-        }
-    }
-}
+use crossterm::{event, style, terminal};
 
 pub struct Window {
     stdout: std::io::Stdout,
@@ -44,8 +23,11 @@ impl Window {
         self.queue(crossterm::cursor::MoveTo(x, y))
     }
 
-    pub fn print_color(&mut self, text: &str, color: Color) -> Result<&mut Self> {
-        self.queue(style::PrintStyledContent(color.stylize(text)))
+    pub fn print_styled<D: std::fmt::Display>(
+        &mut self,
+        content: style::StyledContent<D>,
+    ) -> Result<&mut Self> {
+        self.queue(style::PrintStyledContent(content))
     }
 
     pub fn print<T: std::fmt::Display>(&mut self, text: T) -> Result<&mut Self> {
