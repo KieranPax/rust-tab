@@ -142,21 +142,6 @@ impl fmt::Display for Typing {
     }
 }
 
-fn load_test_file() -> Option<Song> {
-    let path: std::path::PathBuf = "test_song.json".into();
-    if path.is_file() {
-        Some(serde_json::from_str(std::fs::read_to_string(path).unwrap().as_str()).unwrap())
-    } else {
-        None
-    }
-}
-
-fn save_test_file(song: &Song) {
-    let path: std::path::PathBuf = "test_song.json".into();
-    let s = serde_json::to_string(song).unwrap();
-    std::fs::write(path, s).unwrap();
-}
-
 pub struct App {
     should_close: bool,
     song: Song,
@@ -165,28 +150,15 @@ pub struct App {
     sel_string: u16,
     typing: Typing,
     typing_res: String,
+    song_path: Option<String>,
 }
 
 impl App {
     pub fn new() -> Result<Self> {
-        let song = load_test_file()
-            .or_else(|| {
-                Some(Song {
-                    tracks: vec![Track {
-                        string_count: 6,
-                        beats: vec![
-                            Beat::new(Duration::Quarter),
-                            Beat::new(Duration::Quarter),
-                            Beat::new(Duration::Quarter),
-                            Beat::new(Duration::Quarter),
-                        ],
-                    }],
-                })
-            })
-            .unwrap();
         Ok(Self {
             should_close: false,
-            song,
+            song_path: Some("test_song.json".into()),
+            song: Song{tracks:vec![]},
             sel_track: 0,
             sel_beat: 0,
             sel_string: 0,
@@ -247,6 +219,45 @@ impl App {
             format!("{} |", self.typing_res)
         } else {
             format!("{} <", self.typing)
+        }
+    }
+
+    fn save_file(&self, path: String) -> Result<String> {
+        let s = serde_json::to_string(&self.song).unwrap();
+        std::fs::write(&path, s).unwrap();
+        Ok(format!("Saved to {path}"))
+    }
+
+    fn try_save_file(&self, inp: Option<&&str>) -> Result<String> {
+        if let Some(path) = inp {
+            self.save_file(path.to_string())
+        } else {
+            if let Some(path) = self.song_path.clone() {
+                self.save_file(path)
+            } else {
+                Err(Error::MalformedCmd("No default file to save to".into()))
+            }
+        }
+    }
+
+    fn load_file(&mut self, path: String) -> Result<String> {
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            self.song = serde_json::from_str(data.as_str()).unwrap();
+            Ok(format!("Loaded {path}"))
+        } else {
+            Err(Error::InvalidOp("Cannot read file '{path}'".into()))
+        }
+    }
+
+    fn try_load_file(&mut self, inp: Option<&&str>) -> Result<String> {
+        if let Some(path) = inp {
+            self.load_file(path.to_string())
+        } else {
+            if let Some(path) = self.song_path.clone() {
+                self.load_file(path)
+            } else {
+                Err(Error::MalformedCmd("No default file to save to".into()))
+            }
         }
     }
 
@@ -332,6 +343,12 @@ impl App {
                 }
                 None => Err(Error::MalformedCmd(s_cmd)),
             },
+            "f" => match cmd.get(1) {
+                Some(&"save") => self.try_save_file(cmd.get(2)),
+                Some(&"load") => self.try_load_file(cmd.get(2)),
+                Some(_) => Err(Error::UnknownCmd(s_cmd)),
+                None => Err(Error::MalformedCmd(s_cmd)),
+            },
             _ => Err(Error::UnknownCmd(s_cmd)),
         }
     }
@@ -409,6 +426,7 @@ impl App {
     }
 
     pub fn run(mut self) -> Result<()> {
+        self.try_load_file(None)?;
         let mut win = window::Window::new()?;
         win.clear()?;
         let mut do_redraw = true;
@@ -419,7 +437,7 @@ impl App {
             do_redraw = self.proc_event(&mut win)?;
         }
         win.clear()?.update()?;
-        save_test_file(&self.song);
+        self.try_save_file(None)?;
         Ok(())
     }
 }
