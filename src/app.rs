@@ -3,10 +3,12 @@ use crate::{
     window::{self, Color},
 };
 use crossterm::event;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 type BeatRange = std::ops::Range<usize>;
 
+#[derive(Serialize, Deserialize)]
 struct Note {
     string: u16,
     fret: i32,
@@ -18,7 +20,7 @@ impl Note {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 enum Duration {
     Whole,
     Half,
@@ -56,6 +58,7 @@ impl fmt::Display for Duration {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 struct Beat {
     dur: Duration,
     notes: Vec<Note>,
@@ -93,11 +96,13 @@ impl Beat {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 struct Track {
     string_count: u16,
     beats: Vec<Beat>,
 }
 
+#[derive(Serialize, Deserialize)]
 struct Song {
     tracks: Vec<Track>,
 }
@@ -133,6 +138,21 @@ impl fmt::Display for Typing {
     }
 }
 
+fn load_test_file() -> Option<Song> {
+    let path: std::path::PathBuf = "test_song.json".into();
+    if path.is_file() {
+        Some(serde_json::from_str(std::fs::read_to_string(path).unwrap().as_str()).unwrap())
+    } else {
+        None
+    }
+}
+
+fn save_test_file(song: &Song) {
+    let path: std::path::PathBuf = "test_song.json".into();
+    let s = serde_json::to_string(song).unwrap();
+    std::fs::write(path, s).unwrap();
+}
+
 pub struct App {
     should_close: bool,
     song: Song,
@@ -146,17 +166,21 @@ pub struct App {
 
 impl App {
     pub fn new() -> Result<Self> {
-        let song = Song {
-            tracks: vec![Track {
-                string_count: 6,
-                beats: vec![
-                    Beat::new(Duration::Quarter),
-                    Beat::new(Duration::Quarter),
-                    Beat::new(Duration::Quarter),
-                    Beat::new(Duration::Quarter),
-                ],
-            }],
-        };
+        let song = load_test_file()
+            .or_else(|| {
+                Some(Song {
+                    tracks: vec![Track {
+                        string_count: 6,
+                        beats: vec![
+                            Beat::new(Duration::Quarter),
+                            Beat::new(Duration::Quarter),
+                            Beat::new(Duration::Quarter),
+                            Beat::new(Duration::Quarter),
+                        ],
+                    }],
+                })
+            })
+            .unwrap();
         Ok(Self {
             should_close: false,
             song,
@@ -377,6 +401,7 @@ impl App {
             do_redraw = self.proc_event(&mut win)?;
         }
         win.clear()?.update()?;
+        save_test_file(&self.song);
         Ok(())
     }
 }
