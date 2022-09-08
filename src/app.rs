@@ -11,11 +11,11 @@ type BeatRange = std::ops::Range<usize>;
 #[derive(Serialize, Deserialize)]
 struct Note {
     string: u16,
-    fret: i32,
+    fret: u32,
 }
 
 impl Note {
-    fn new(string: u16, fret: i32) -> Self {
+    fn new(string: u16, fret: u32) -> Self {
         Self { string, fret }
     }
 }
@@ -86,7 +86,7 @@ impl Beat {
         None
     }
 
-    fn set_note(&mut self, string: u16, fret: i32) {
+    fn set_note(&mut self, string: u16, fret: u32) {
         for i in self.notes.iter_mut() {
             if i.string == string {
                 i.fret = fret;
@@ -112,6 +112,7 @@ struct Song {
 enum Typing {
     None,
     Command(String),
+    NoteEdit(String),
 }
 
 impl Typing {
@@ -119,6 +120,7 @@ impl Typing {
         match self {
             Typing::None => None,
             Typing::Command(s) => Some(s),
+            Typing::NoteEdit(s) => Some(s),
         }
     }
 
@@ -135,6 +137,7 @@ impl fmt::Display for Typing {
         match self {
             Typing::None => Ok(()),
             Typing::Command(text) => f.write_fmt(format_args!("cmd:{text}")),
+            Typing::NoteEdit(text) => f.write_fmt(format_args!("note:{text}")),
         }
     }
 }
@@ -157,7 +160,6 @@ fn save_test_file(song: &Song) {
 pub struct App {
     should_close: bool,
     song: Song,
-    last_cursor_y: u16,
     sel_track: usize,
     sel_beat: usize,
     sel_string: u16,
@@ -185,7 +187,6 @@ impl App {
         Ok(Self {
             should_close: false,
             song,
-            last_cursor_y: 0,
             sel_track: 0,
             sel_beat: 0,
             sel_string: 0,
@@ -206,9 +207,9 @@ impl App {
         let track = self.track();
         win.moveto(0, 0)?;
         for i in range {
-            win.print(format!("+ {} ", track.beats[i].dur))?;
+            win.print(format!("~ {} ", track.beats[i].dur))?;
         }
-        win.print("+")?;
+        win.print("~")?;
         Ok(())
     }
 
@@ -217,22 +218,27 @@ impl App {
         let sel_string = self.sel_string == string;
         win.moveto(0, string + 1)?;
         for i in range {
+            win.print("―")?;
             let inner: String = if let Some(val) = track.beats[i].get_note(string) {
-                format!("{: ^3}", val.fret)
+                if val.fret > 999 {
+                    "###".into()
+                } else {
+                    format!("{: ^3}", val.fret)
+                }
             } else {
-                "   ".into()
+                "―――".into()
             };
             if self.sel_beat as usize == i {
-                win.print("|")?.print_styled(if sel_string {
+                win.print_styled(if sel_string {
                     inner.as_str().on_white().black()
                 } else {
                     inner.as_str().on_dark_grey().black()
                 })?;
             } else {
-                win.print(format!("|{inner}"))?;
+                win.print(inner)?;
             }
         }
-        win.print("|")?;
+        win.print("―")?;
         Ok(())
     }
 
@@ -250,7 +256,7 @@ impl App {
         start..start + len
     }
 
-    fn draw(&self, win: &mut window::Window, (w, _h): (u16, u16)) -> Result<u16> {
+    fn draw(&self, win: &mut window::Window, (w, _h): (u16, u16)) -> Result<()> {
         let track = self.track();
         win.moveto(0, 0)?;
         let range = self.visible_beat_range(w / 4);
@@ -262,7 +268,7 @@ impl App {
             .clear_line()?
             .print(self.gen_status_msg())?
             .update()?;
-        Ok(track.string_count + 3)
+        Ok(())
     }
 
     fn seek_string(&mut self, dire: i16) {
@@ -312,7 +318,7 @@ impl App {
             },
             "n" => match cmd.get(1) {
                 Some(s) => {
-                    if let Ok(fret) = s.parse::<i32>() {
+                    if let Ok(fret) = s.parse::<u32>() {
                         let beat = self.sel_beat;
                         let string = self.sel_string;
                         self.track_mut().beats[beat].set_note(string, fret);
@@ -330,9 +336,22 @@ impl App {
         }
     }
 
+    fn process_note_edit(&mut self, s_fret: String) -> Result<String> {
+        let fret = s_fret.parse();
+        if fret.is_ok() {
+            let beat = self.sel_beat;
+            let string = self.sel_string;
+            self.track_mut().beats[beat].set_note(string, fret.unwrap());
+            Ok("Set fret ({fret})".into())
+        } else {
+            Err(Error::MalformedCmd("Cannot parse {s_fret:?} as int".into()))
+        }
+    }
+
     fn process_typing(&mut self) -> Result<()> {
         let res = match self.typing.clone() {
             Typing::Command(s) => self.process_command(s),
+            Typing::NoteEdit(s) => self.process_note_edit(s),
             Typing::None => panic!("App.typing hasn't been initiated"),
         };
         if let Err(e) = res {
@@ -363,6 +382,7 @@ impl App {
                 event::KeyCode::Char('d') => self.seek_beat(1),
                 event::KeyCode::Char('w') => self.seek_string(-1),
                 event::KeyCode::Char('s') => self.seek_string(1),
+                event::KeyCode::Char('n') => self.typing = Typing::NoteEdit("".into()),
                 event::KeyCode::Char(' ') => {
                     self.typing = Typing::Command(String::with_capacity(16))
                 }
@@ -394,7 +414,7 @@ impl App {
         let mut do_redraw = true;
         while !self.should_close {
             if do_redraw {
-                self.last_cursor_y = self.draw(&mut win, crossterm::terminal::size().unwrap())?;
+                self.draw(&mut win, crossterm::terminal::size().unwrap())?;
             }
             do_redraw = self.proc_event(&mut win)?;
         }
