@@ -79,7 +79,7 @@ impl std::str::FromStr for Duration {
             "8" => Ok(Self::Eighth),
             "16" => Ok(Self::Sixteenth),
             "32" => Ok(Self::ThirtyTwoth),
-            _=> Err(Error::InvalidOp(format!("Cannot parse '{s}' as Duration")))
+            _ => Err(Error::InvalidOp(format!("Cannot parse '{s}' as Duration"))),
         }
     }
 }
@@ -137,9 +137,26 @@ struct Track {
     beats: Vec<Beat>,
 }
 
+impl Track {
+    fn new() -> Self {
+        Self {
+            string_count: 6,
+            beats: vec![Beat::new(Duration::Whole)],
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct Song {
     tracks: Vec<Track>,
+}
+
+impl Song {
+    fn new() -> Self {
+        Self {
+            tracks: vec![Track::new()],
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -156,7 +173,11 @@ impl Typing {
     fn mut_string(&mut self) -> Option<&mut String> {
         match self {
             Typing::None => None,
-            Typing::Command(s) | Typing::Note(s) | Typing::Copy(s) | Typing::Delete(s) | Typing::Duration(s) => Some(s),
+            Typing::Command(s)
+            | Typing::Note(s)
+            | Typing::Copy(s)
+            | Typing::Delete(s)
+            | Typing::Duration(s) => Some(s),
         }
     }
 
@@ -223,7 +244,7 @@ impl App {
         Ok(Self {
             should_close: false,
             song_path: Some("test_song.json".into()),
-            song: Song { tracks: vec![] },
+            song: Song::new(),
             sel_track: 0,
             sel_beat: 0,
             sel_string: 0,
@@ -363,10 +384,7 @@ impl App {
     }
 
     fn add_track(&mut self) {
-        self.song.tracks.push(Track {
-            beats: vec![Beat::new(Duration::Whole)],
-            string_count: 6,
-        });
+        self.song.tracks.push(Track::new());
     }
 
     fn process_command(&mut self, s_cmd: String) -> Result<String> {
@@ -611,7 +629,7 @@ impl App {
 
     pub fn run(mut self) -> Result<()> {
         let args = Args::parse();
-        self.load_file(args.path)?;
+        if self.load_file(args.path).is_err() {}
         let mut win = window::Window::new()?;
         win.clear()?;
         let mut do_redraw = true;
