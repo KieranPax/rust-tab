@@ -113,6 +113,7 @@ enum Typing {
     None,
     Command(String),
     NoteEdit(String),
+    Copy(String),
 }
 
 impl Typing {
@@ -121,12 +122,20 @@ impl Typing {
             Typing::None => None,
             Typing::Command(s) => Some(s),
             Typing::NoteEdit(s) => Some(s),
+            Typing::Copy(s) => Some(s),
         }
     }
 
     fn is_none(&self) -> bool {
         match self {
             Typing::None => true,
+            _ => false,
+        }
+    }
+
+    fn is_number_char(&self) -> bool {
+        match self {
+            Typing::Copy(_) => true,
             _ => false,
         }
     }
@@ -138,6 +147,7 @@ impl fmt::Display for Typing {
             Typing::None => Ok(()),
             Typing::Command(text) => f.write_fmt(format_args!("cmd:{text}")),
             Typing::NoteEdit(text) => f.write_fmt(format_args!("note:{text}")),
+            Typing::Copy(text) => f.write_fmt(format_args!("copy:{text}")),
         }
     }
 }
@@ -146,6 +156,7 @@ enum Buffer {
     Empty,
     Note(Note),
     Beat(Beat),
+    MultiBeat(Vec<Beat>),
 }
 
 impl fmt::Debug for Buffer {
@@ -154,6 +165,7 @@ impl fmt::Debug for Buffer {
             Self::Empty => write!(f, "Empty"),
             Self::Note(_) => write!(f, "Note"),
             Self::Beat(_) => write!(f, "Beat"),
+            Self::MultiBeat(_) => write!(f, "MultiBeat"),
         }
     }
 }
@@ -167,7 +179,6 @@ pub struct App {
     typing: Typing,
     typing_res: String,
     song_path: Option<String>,
-    catch_copy: Option<String>,
     copy_buffer: Buffer,
 }
 
@@ -182,7 +193,6 @@ impl App {
             sel_string: 0,
             typing: Typing::None,
             typing_res: "".into(),
-            catch_copy: None,
             copy_buffer: Buffer::Empty,
         })
     }
@@ -235,15 +245,10 @@ impl App {
     }
 
     fn gen_status_msg(&self) -> String {
-        let msg = if let Some(c) = &self.catch_copy {
-            format!("copy:{c}")
-        } else {
-            format!("buffer:{:?}", self.copy_buffer)
-        };
         if self.typing.is_none() {
-            format!("{} | {msg}", self.typing_res)
+            format!("{} | buffer : {:?}", self.typing_res, self.copy_buffer)
         } else {
-            format!("{} < {msg}", self.typing)
+            format!("{} < buffer : {:?}", self.typing, self.copy_buffer)
         }
     }
 
@@ -391,10 +396,43 @@ impl App {
         }
     }
 
+    fn process_copy(&mut self, copy: String) -> Result<String> {
+        if copy.len() == 0 {
+            Ok(String::new())
+        } else {
+            let (a, b) = copy.split_at(copy.len() - 1);
+            let a: std::result::Result<usize, _> = a.parse();
+            match (a, b) {
+                (_, "n") => {
+                    let beat = &self.track().beats[self.sel_beat];
+                    if let Some(note) = beat.get_note(self.sel_string) {
+                        self.copy_buffer = Buffer::Note(note.clone());
+                        Ok("Note copied".into())
+                    } else {
+                        self.copy_buffer = Buffer::Empty;
+                        Err(Error::InvalidOp("No note selected".into()))
+                    }
+                }
+                (Ok(count), "b") => {
+                    let beat = &self.track().beats[self.sel_beat..self.sel_beat + count];
+                    self.copy_buffer = Buffer::MultiBeat(beat.to_owned());
+                    Ok("Beat(s) copied".into())
+                }
+                (_, "b") => {
+                    let beat = &self.track().beats[self.sel_beat];
+                    self.copy_buffer = Buffer::Beat(beat.clone());
+                    Ok("Beat copied".into())
+                }
+                _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
+            }
+        }
+    }
+
     fn process_typing(&mut self) -> Result<()> {
         let res = match self.typing.clone() {
             Typing::Command(s) => self.process_command(s),
             Typing::NoteEdit(s) => self.process_note_edit(s),
+            Typing::Copy(s) => self.process_copy(s),
             Typing::None => panic!("App.typing hasn't been initiated"),
         };
         if let Err(e) = res {
@@ -426,36 +464,29 @@ impl App {
                     self.track_mut().beats.insert(index, beat);
                 }
             }
+            Buffer::MultiBeat(beats) => {
+                let index = self.sel_beat;
+                let src = beats.clone();
+                if in_place {
+                    self.track_mut().beats.remove(index);
+                }
+                let dest = &mut self.track_mut().beats;
+                let after = dest.split_off(index);
+                dest.extend(src);
+                dest.extend(after);
+            }
         }
     }
 
     fn key_press(&mut self, key: event::KeyCode) {
-        if self.catch_copy.is_some() {
+        if let Some(typing) = self.typing.mut_string() {
             match key {
-                event::KeyCode::Char('n') => {
-                    let beat = &self.track().beats[self.sel_beat];
-                    if let Some(note) = beat.get_note(self.sel_string) {
-                        self.copy_buffer = Buffer::Note(note.clone());
-                    } else {
-                        self.copy_buffer = Buffer::Empty;
-                    }
-                    self.catch_copy = None;
-                }
-                event::KeyCode::Char('b') => {
-                    let beat = &self.track().beats[self.sel_beat];
-                    self.copy_buffer = Buffer::Beat(beat.clone());
-                    self.catch_copy = None;
-                }
                 event::KeyCode::Char(c) => {
-                    if c.is_digit(10) {
-                        self.catch_copy.as_mut().unwrap().push(c);
+                    typing.push(c);
+                    if self.typing.is_number_char() && !c.is_digit(10) {
+                        self.process_typing().unwrap()
                     }
                 }
-                _ => {}
-            }
-        } else if let Some(typing) = self.typing.mut_string() {
-            match key {
-                event::KeyCode::Char(c) => typing.push(c),
                 event::KeyCode::Enter => self.process_typing().unwrap(),
                 event::KeyCode::Backspace => {
                     typing.pop();
@@ -470,7 +501,7 @@ impl App {
                 event::KeyCode::Char('w') => self.seek_string(-1),
                 event::KeyCode::Char('s') => self.seek_string(1),
                 event::KeyCode::Char('n') => self.typing = Typing::NoteEdit(String::new()),
-                event::KeyCode::Char('c') => self.catch_copy = Some(String::new()),
+                event::KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
                 event::KeyCode::Char('v') => self.paste_once(false),
                 event::KeyCode::Char('V') => self.paste_once(true),
                 event::KeyCode::Char(' ') => {
