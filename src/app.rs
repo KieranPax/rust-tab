@@ -2,9 +2,18 @@ use crate::{
     error::{Error, Result},
     window,
 };
+use clap::Parser;
 use crossterm::{event, style::Stylize};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+
+#[derive(Parser, Debug)]
+#[clap(name = "tab")]
+#[clap(version, about, long_about = None)]
+struct Args {
+    #[clap(required = true, value_parser)]
+    path: String,
+}
 
 type BeatRange = std::ops::Range<usize>;
 
@@ -569,7 +578,8 @@ impl App {
     }
 
     pub fn run(mut self) -> Result<()> {
-        self.try_load_file(None)?;
+        let args = Args::parse();
+        self.load_file(args.path)?;
         let mut win = window::Window::new()?;
         win.clear()?;
         let mut do_redraw = true;
