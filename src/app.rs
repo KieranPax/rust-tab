@@ -8,7 +8,7 @@ use std::fmt;
 
 type BeatRange = std::ops::Range<usize>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct Note {
     string: u16,
     fret: u32,
@@ -59,7 +59,7 @@ impl fmt::Display for Duration {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct Beat {
     dur: Duration,
     notes: Vec<Note>,
@@ -142,6 +142,22 @@ impl fmt::Display for Typing {
     }
 }
 
+enum Buffer {
+    Empty,
+    Note(Note),
+    Beat(Beat),
+}
+
+impl fmt::Debug for Buffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Empty => write!(f, "Empty"),
+            Self::Note(_) => write!(f, "Note"),
+            Self::Beat(_) => write!(f, "Beat"),
+        }
+    }
+}
+
 pub struct App {
     should_close: bool,
     song: Song,
@@ -151,6 +167,8 @@ pub struct App {
     typing: Typing,
     typing_res: String,
     song_path: Option<String>,
+    catch_copy: Option<String>,
+    copy_buffer: Buffer,
 }
 
 impl App {
@@ -158,12 +176,14 @@ impl App {
         Ok(Self {
             should_close: false,
             song_path: Some("test_song.json".into()),
-            song: Song{tracks:vec![]},
+            song: Song { tracks: vec![] },
             sel_track: 0,
             sel_beat: 0,
             sel_string: 0,
             typing: Typing::None,
             typing_res: "".into(),
+            catch_copy: None,
+            copy_buffer: Buffer::Empty,
         })
     }
 
@@ -215,10 +235,15 @@ impl App {
     }
 
     fn gen_status_msg(&self) -> String {
-        if self.typing.is_none() {
-            format!("{} |", self.typing_res)
+        let msg = if let Some(c) = &self.catch_copy {
+            format!("copy:{c}")
         } else {
-            format!("{} <", self.typing)
+            format!("buffer:{:?}", self.copy_buffer)
+        };
+        if self.typing.is_none() {
+            format!("{} | {msg}", self.typing_res)
+        } else {
+            format!("{} < {msg}", self.typing)
         }
     }
 
@@ -354,14 +379,15 @@ impl App {
     }
 
     fn process_note_edit(&mut self, s_fret: String) -> Result<String> {
-        let fret = s_fret.parse();
-        if fret.is_ok() {
+        if let Ok(fret) = s_fret.parse() {
             let beat = self.sel_beat;
             let string = self.sel_string;
-            self.track_mut().beats[beat].set_note(string, fret.unwrap());
-            Ok("Set fret ({fret})".into())
+            self.track_mut().beats[beat].set_note(string, fret);
+            Ok(format!("Set fret ({fret})"))
         } else {
-            Err(Error::MalformedCmd("Cannot parse {s_fret:?} as int".into()))
+            Err(Error::MalformedCmd(format!(
+                "Cannot parse {s_fret:?} as int"
+            )))
         }
     }
 
@@ -382,8 +408,33 @@ impl App {
         }
     }
 
+    fn paste_once(&mut self) {}
+
     fn key_press(&mut self, key: event::KeyCode) {
-        if let Some(typing) = self.typing.mut_string() {
+        if self.catch_copy.is_some() {
+            match key {
+                event::KeyCode::Char('n') => {
+                    let beat = &self.track().beats[self.sel_beat];
+                    if let Some(note) = beat.get_note(self.sel_string) {
+                        self.copy_buffer = Buffer::Note(note.clone());
+                    } else {
+                        self.copy_buffer = Buffer::Empty;
+                    }
+                    self.catch_copy = None;
+                }
+                event::KeyCode::Char('b') => {
+                    let beat = &self.track().beats[self.sel_beat];
+                    self.copy_buffer = Buffer::Beat(beat.clone());
+                    self.catch_copy = None;
+                }
+                event::KeyCode::Char(c) => {
+                    if c.is_digit(10) {
+                        self.catch_copy.as_mut().unwrap().push(c);
+                    }
+                }
+                _ => {}
+            }
+        } else if let Some(typing) = self.typing.mut_string() {
             match key {
                 event::KeyCode::Char(c) => typing.push(c),
                 event::KeyCode::Enter => self.process_typing().unwrap(),
@@ -399,7 +450,9 @@ impl App {
                 event::KeyCode::Char('d') => self.seek_beat(1),
                 event::KeyCode::Char('w') => self.seek_string(-1),
                 event::KeyCode::Char('s') => self.seek_string(1),
-                event::KeyCode::Char('n') => self.typing = Typing::NoteEdit("".into()),
+                event::KeyCode::Char('n') => self.typing = Typing::NoteEdit(String::new()),
+                event::KeyCode::Char('c') => self.catch_copy = Some(String::new()),
+                event::KeyCode::Char('v') => self.paste_once(),
                 event::KeyCode::Char(' ') => {
                     self.typing = Typing::Command(String::with_capacity(16))
                 }
