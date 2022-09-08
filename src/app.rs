@@ -414,9 +414,13 @@ impl App {
                     }
                 }
                 (Ok(count), "b") => {
-                    let beat = &self.track().beats[self.sel_beat..self.sel_beat + count];
-                    self.copy_buffer = Buffer::MultiBeat(beat.to_owned());
-                    Ok("Beat(s) copied".into())
+                    if let Some(beat) = self.track().beats.get(self.sel_beat..self.sel_beat + count)
+                    {
+                        self.copy_buffer = Buffer::MultiBeat(beat.to_owned());
+                        Ok("Beat(s) copied".into())
+                    } else {
+                        Err(Error::InvalidOp("Copy range out of range".into()))
+                    }
                 }
                 (_, "b") => {
                     let beat = &self.track().beats[self.sel_beat];
