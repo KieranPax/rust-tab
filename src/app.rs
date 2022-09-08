@@ -408,7 +408,26 @@ impl App {
         }
     }
 
-    fn paste_once(&mut self) {}
+    fn paste_once(&mut self, in_place: bool) {
+        match &self.copy_buffer {
+            Buffer::Empty => {}
+            Buffer::Note(note) => {
+                let beat = self.sel_beat;
+                let string = self.sel_string;
+                let fret = note.fret;
+                self.track_mut().beats[beat].set_note(string, fret);
+            }
+            Buffer::Beat(beat) => {
+                let index = self.sel_beat;
+                let beat = beat.clone();
+                if in_place {
+                    self.track_mut().beats[index] = beat;
+                } else {
+                    self.track_mut().beats.insert(index, beat);
+                }
+            }
+        }
+    }
 
     fn key_press(&mut self, key: event::KeyCode) {
         if self.catch_copy.is_some() {
@@ -452,7 +471,8 @@ impl App {
                 event::KeyCode::Char('s') => self.seek_string(1),
                 event::KeyCode::Char('n') => self.typing = Typing::NoteEdit(String::new()),
                 event::KeyCode::Char('c') => self.catch_copy = Some(String::new()),
-                event::KeyCode::Char('v') => self.paste_once(),
+                event::KeyCode::Char('v') => self.paste_once(false),
+                event::KeyCode::Char('V') => self.paste_once(true),
                 event::KeyCode::Char(' ') => {
                     self.typing = Typing::Command(String::with_capacity(16))
                 }
