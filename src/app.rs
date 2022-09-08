@@ -95,6 +95,15 @@ impl Beat {
         }
         self.notes.push(Note::new(string, fret))
     }
+
+    fn del_note(&mut self, string: u16) {
+        for i in 0..self.notes.len() {
+            if self.notes[i].string == string {
+                self.notes.swap_remove(i);
+                return;
+            }
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -114,15 +123,14 @@ enum Typing {
     Command(String),
     Note(String),
     Copy(String),
+    Delete(String),
 }
 
 impl Typing {
     fn mut_string(&mut self) -> Option<&mut String> {
         match self {
             Typing::None => None,
-            Typing::Command(s) => Some(s),
-            Typing::Note(s) => Some(s),
-            Typing::Copy(s) => Some(s),
+            Typing::Command(s) | Typing::Note(s) | Typing::Copy(s) | Typing::Delete(s) => Some(s),
         }
     }
 
@@ -135,7 +143,7 @@ impl Typing {
 
     fn is_number_char(&self) -> bool {
         match self {
-            Typing::Copy(_) => true,
+            Typing::Copy(_) | Typing::Delete(_) => true,
             _ => false,
         }
     }
@@ -148,6 +156,7 @@ impl fmt::Display for Typing {
             Typing::Command(text) => f.write_fmt(format_args!("cmd:{text}")),
             Typing::Note(text) => f.write_fmt(format_args!("note:{text}")),
             Typing::Copy(text) => f.write_fmt(format_args!("copy:{text}")),
+            Typing::Delete(text) => f.write_fmt(format_args!("delete:{text}")),
         }
     }
 }
@@ -246,9 +255,9 @@ impl App {
 
     fn gen_status_msg(&self) -> String {
         if self.typing.is_none() {
-            format!("{} | buffer : {:?}", self.typing_res, self.copy_buffer)
+            format!("{} | buffer : {:?} | {}", self.typing_res, self.copy_buffer, self.track().beats.len())
         } else {
-            format!("{} < buffer : {:?}", self.typing, self.copy_buffer)
+            format!("{} $ buffer : {:?} | {}", self.typing, self.copy_buffer, self.track().beats.len())
         }
     }
 
@@ -396,11 +405,11 @@ impl App {
         }
     }
 
-    fn process_copy(&mut self, copy: String) -> Result<String> {
-        if copy.len() == 0 {
+    fn process_copy(&mut self, cmd: String) -> Result<String> {
+        if cmd.len() == 0 {
             Ok(String::new())
         } else {
-            let (a, b) = copy.split_at(copy.len() - 1);
+            let (a, b) = cmd.split_at(cmd.len() - 1);
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => {
@@ -432,11 +441,36 @@ impl App {
         }
     }
 
+    fn process_delete(&mut self, cmd: String) -> Result<String> {
+        if cmd.len() == 0 {
+            Ok(String::new())
+        } else {
+            let (a, b) = cmd.split_at(cmd.len() - 1);
+            let a: std::result::Result<usize, _> = a.parse();
+            match (a, b) {
+                (_, "n") => {
+                    let beat = self.sel_beat;
+                    let string = self.sel_string;
+                    let beat: &mut Beat = &mut self.track_mut().beats[beat];
+                    beat.del_note(string);
+                    Ok("Note deleted".into())
+                }
+                (_, "b") => {
+                    let beat = self.sel_beat;
+                    self.track_mut().beats.remove(beat);
+                    Ok("Beat deleted".into())
+                }
+                _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
+            }
+        }
+    }
+
     fn process_typing(&mut self) -> Result<()> {
         let res = match self.typing.clone() {
             Typing::Command(s) => self.process_command(s),
             Typing::Note(s) => self.process_note_edit(s),
             Typing::Copy(s) => self.process_copy(s),
+            Typing::Delete(s) => self.process_delete(s),
             Typing::None => panic!("App.typing hasn't been initiated"),
         };
         if let Err(e) = res {
@@ -506,6 +540,7 @@ impl App {
                 event::KeyCode::Char('s') => self.seek_string(1),
                 event::KeyCode::Char('n') => self.typing = Typing::Note(String::new()),
                 event::KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
+                event::KeyCode::Backspace => self.typing = Typing::Delete(String::new()),
                 event::KeyCode::Char('v') => self.paste_once(false),
                 event::KeyCode::Char('V') => self.paste_once(true),
                 event::KeyCode::Char(' ') => {
