@@ -20,7 +20,8 @@ impl Note {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, serde_repr::Serialize_repr, serde_repr::Deserialize_repr)]
+#[repr(u8)]
 enum Duration {
     Whole,
     Half,
