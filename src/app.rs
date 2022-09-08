@@ -464,6 +464,11 @@ impl App {
                     beat.del_note(string);
                     Ok("Note deleted".into())
                 }
+                (Ok(count), "b") => {
+                    let beat = self.sel_beat;
+                    self.track_mut().beats.splice(beat..beat + count, []);
+                    Ok("Beat deleted".into())
+                }
                 (_, "b") => {
                     let beat = self.sel_beat;
                     self.track_mut().beats.remove(beat);
@@ -549,7 +554,7 @@ impl App {
                 event::KeyCode::Char('s') => self.seek_string(1),
                 event::KeyCode::Char('n') => self.typing = Typing::Note(String::new()),
                 event::KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
-                event::KeyCode::Backspace => self.typing = Typing::Delete(String::new()),
+                event::KeyCode::Char('x') => self.typing = Typing::Delete(String::new()),
                 event::KeyCode::Char('v') => self.paste_once(false),
                 event::KeyCode::Char('V') => self.paste_once(true),
                 event::KeyCode::Char(' ') => {
