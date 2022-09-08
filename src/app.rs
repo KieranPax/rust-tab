@@ -396,7 +396,14 @@ impl App {
                     self.add_track();
                     Ok(format!("Added track [{}]", self.song.tracks.len() - 1))
                 }
-                Some(_) => Err(Error::UnknownCmd(s_cmd)),
+                Some(s) => {
+                    if let Ok(index) = s.parse() {
+                        self.sel_track = index;
+                        Ok(format!("Switched to track [{index}]"))
+                    } else {
+                        Err(Error::UnknownCmd(s_cmd))
+                    }
+                }
                 None => Err(Error::MalformedCmd(s_cmd)),
             },
             "b" => match cmd.get(1) {
@@ -602,9 +609,7 @@ impl App {
                 event::KeyCode::Char('l') => self.typing = Typing::Duration(String::new()),
                 event::KeyCode::Char('v') => self.paste_once(false),
                 event::KeyCode::Char('V') => self.paste_once(true),
-                event::KeyCode::Char(' ') => {
-                    self.typing = Typing::Command(String::with_capacity(16))
-                }
+                event::KeyCode::Char(':') => self.typing = Typing::Command(String::new()),
                 _ => {}
             }
         }
