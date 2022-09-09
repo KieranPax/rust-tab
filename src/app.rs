@@ -255,11 +255,27 @@ impl App {
     }
 
     fn track(&self) -> &Track {
-        self.song.tracks.get(self.sel_track).unwrap()
+        &self.song.tracks[self.sel_track]
     }
 
     fn track_mut(&mut self) -> &mut Track {
-        self.song.tracks.get_mut(self.sel_track).unwrap()
+        &mut self.song.tracks[self.sel_track]
+    }
+
+    fn beats(&self) -> &Vec<Beat> {
+        &self.song.tracks[self.sel_track].beats
+    }
+
+    fn beats_mut(&mut self) -> &mut Vec<Beat> {
+        &mut self.song.tracks[self.sel_track].beats
+    }
+
+    fn beat(&self) -> &Beat {
+        &self.song.tracks[self.sel_track].beats[self.sel_beat]
+    }
+
+    fn beat_mut(&mut self) -> &mut Beat {
+        &mut self.song.tracks[self.sel_track].beats[self.sel_beat]
     }
 
     fn draw_durations(&self, win: &mut window::Window, range: BeatRange) -> Result<()> {
@@ -350,7 +366,7 @@ impl App {
 
     fn visible_beat_range(&self, max: u16) -> BeatRange {
         let start = 0;
-        let len = (max as usize).min(self.track().beats.len());
+        let len = (max as usize).min(self.beats().len());
         start..start + len
     }
 
@@ -376,7 +392,7 @@ impl App {
 
     fn seek_beat(&mut self, dire: isize) {
         let new = (self.sel_beat as isize + dire).max(0) as usize;
-        let beats = &mut self.track_mut().beats;
+        let beats = self.beats_mut();
         while new >= beats.len() as usize {
             beats.push(beats.last().unwrap().copy_duration());
         }
@@ -421,12 +437,11 @@ impl App {
             "n" => match cmd.get(1) {
                 Some(s) => {
                     if let Ok(fret) = s.parse::<u32>() {
-                        let beat = self.sel_beat;
                         let string = self.sel_string;
-                        self.track_mut().beats[beat].set_note(string, fret);
+                        self.beat_mut().set_note(string, fret);
                         Ok(format!(
                             "Note count : {}",
-                            self.track_mut().beats[beat].notes.len()
+                            self.beat().notes.len()
                         ))
                     } else {
                         Err(Error::UnknownCmd(s_cmd))
@@ -446,9 +461,8 @@ impl App {
 
     fn process_note_edit(&mut self, s_fret: String) -> Result<String> {
         if let Ok(fret) = s_fret.parse() {
-            let beat = self.sel_beat;
             let string = self.sel_string;
-            self.track_mut().beats[beat].set_note(string, fret);
+            self.beat_mut().set_note(string, fret);
             Ok(format!("Set fret ({fret})"))
         } else {
             Err(Error::MalformedCmd(format!(
@@ -465,8 +479,7 @@ impl App {
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => {
-                    let beat = &self.track().beats[self.sel_beat];
-                    if let Some(note) = beat.get_note(self.sel_string) {
+                    if let Some(note) = self.beat().get_note(self.sel_string) {
                         self.copy_buffer = Buffer::Note(note.clone());
                         Ok("Note copied".into())
                     } else {
@@ -475,7 +488,7 @@ impl App {
                     }
                 }
                 (Ok(count), "b") => {
-                    if let Some(beat) = self.track().beats.get(self.sel_beat..self.sel_beat + count)
+                    if let Some(beat) = self.beats().get(self.sel_beat..self.sel_beat + count)
                     {
                         self.copy_buffer = Buffer::MultiBeat(beat.to_owned());
                         Ok("Beat(s) copied".into())
@@ -484,8 +497,7 @@ impl App {
                     }
                 }
                 (_, "b") => {
-                    let beat = &self.track().beats[self.sel_beat];
-                    self.copy_buffer = Buffer::Beat(beat.clone());
+                    self.copy_buffer = Buffer::Beat(self.beat().clone());
                     Ok("Beat copied".into())
                 }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
@@ -501,20 +513,18 @@ impl App {
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => {
-                    let beat = self.sel_beat;
                     let string = self.sel_string;
-                    let beat: &mut Beat = &mut self.track_mut().beats[beat];
-                    beat.del_note(string);
+                    self.beat_mut().del_note(string);
                     Ok("Note deleted".into())
                 }
                 (Ok(count), "b") => {
                     let beat = self.sel_beat;
-                    self.track_mut().beats.splice(beat..beat + count, []);
+                    self.beats_mut().splice(beat..beat + count, []);
                     Ok("Beat deleted".into())
                 }
                 (_, "b") => {
                     let beat = self.sel_beat;
-                    self.track_mut().beats.remove(beat);
+                    self.beats_mut().remove(beat);
                     Ok("Beat deleted".into())
                 }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
@@ -524,8 +534,7 @@ impl App {
 
     fn process_duration(&mut self, cmd: String) -> Result<String> {
         let dur: Duration = cmd.parse()?;
-        let beat = self.sel_beat;
-        self.track_mut().beats[beat].dur = dur;
+        self.beat_mut().dur = dur;
         Ok(format!("{dur:?}"))
     }
 
@@ -553,27 +562,26 @@ impl App {
         match &self.copy_buffer {
             Buffer::Empty => {}
             Buffer::Note(note) => {
-                let beat = self.sel_beat;
                 let string = self.sel_string;
                 let fret = note.fret;
-                self.track_mut().beats[beat].set_note(string, fret);
+                self.beat_mut().set_note(string, fret);
             }
             Buffer::Beat(beat) => {
                 let index = self.sel_beat;
                 let beat = beat.clone();
                 if in_place {
-                    self.track_mut().beats[index] = beat;
+                    self.beats_mut()[index] = beat;
                 } else {
-                    self.track_mut().beats.insert(index, beat);
+                    self.beats_mut().insert(index, beat);
                 }
             }
             Buffer::MultiBeat(beats) => {
                 let index = self.sel_beat;
                 let src = beats.clone();
                 if in_place {
-                    self.track_mut().beats.remove(index);
+                    self.beats_mut().remove(index);
                 }
-                let dest = &mut self.track_mut().beats;
+                let dest = self.beats_mut();
                 let after = dest.split_off(index);
                 dest.extend(src);
                 dest.extend(after);
