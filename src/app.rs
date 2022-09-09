@@ -218,6 +218,7 @@ enum Typing {
     Copy(String),
     Delete(String),
     Duration(String),
+    Clean(String),
 }
 
 impl Typing {
@@ -228,7 +229,8 @@ impl Typing {
             | Typing::Note(s)
             | Typing::Copy(s)
             | Typing::Delete(s)
-            | Typing::Duration(s) => Some(s),
+            | Typing::Duration(s)
+            | Typing::Clean(s) => Some(s),
         }
     }
 
@@ -241,7 +243,7 @@ impl Typing {
 
     fn is_number_char(&self) -> bool {
         match self {
-            Typing::Copy(_) | Typing::Delete(_) => true,
+            Typing::Copy(_) | Typing::Delete(_) | Typing::Clean(_) => true,
             _ => false,
         }
     }
@@ -256,6 +258,7 @@ impl fmt::Display for Typing {
             Typing::Copy(text) => f.write_fmt(format_args!("copy:{text}")),
             Typing::Delete(text) => f.write_fmt(format_args!("delete:{text}")),
             Typing::Duration(text) => f.write_fmt(format_args!("duration:{text}")),
+            Typing::Clean(text) => f.write_fmt(format_args!("clean:{text}")),
         }
     }
 }
@@ -617,6 +620,35 @@ impl App {
         Ok(format!("{dur:?}"))
     }
 
+    fn proc_t_clean(&mut self, cmd: String) -> Result<String> {
+        if cmd.len() == 0 {
+            Ok(String::new())
+        } else {
+            let (a, b) = cmd.split_at(cmd.len() - 1);
+            let a: std::result::Result<usize, _> = a.parse();
+            match (a, b) {
+                (_, "n") => {
+                    let string = self.sel.string;
+                    self.sel.beat_mut(&mut self.song).del_note(string);
+                    Ok("Note cleared".into())
+                }
+                (Ok(count), "b") => {
+                    let beat = self.sel.beat;
+                    let beats = self.sel.beats_mut(&mut self.song);
+                    for i in beat..beat + count {
+                        beats[i].notes.clear()
+                    }
+                    Ok("Beat cleared".into())
+                }
+                (_, "b") => {
+                    self.sel.beat_mut(&mut self.song).notes.clear();
+                    Ok("Beat cleared".into())
+                }
+                _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
+            }
+        }
+    }
+
     fn process_typing(&mut self) -> Result<()> {
         let res = match self.typing.clone() {
             Typing::Command(s) => self.proc_t_command(s),
@@ -624,6 +656,7 @@ impl App {
             Typing::Copy(s) => self.proc_t_copy(s),
             Typing::Delete(s) => self.proc_t_delete(s),
             Typing::Duration(s) => self.proc_t_duration(s),
+            Typing::Clean(s) => self.proc_t_clean(s),
             Typing::None => panic!("App.typing hasn't been initiated"),
         };
         if let Err(e) = res {
@@ -694,6 +727,7 @@ impl App {
                 event::KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
                 event::KeyCode::Char('x') => self.typing = Typing::Delete(String::new()),
                 event::KeyCode::Char('l') => self.typing = Typing::Duration(String::new()),
+                event::KeyCode::Char('k') => self.typing = Typing::Clean(String::new()),
                 event::KeyCode::Char('v') => self.paste_once(false),
                 event::KeyCode::Char('V') => self.paste_once(true),
                 event::KeyCode::Char(':') => self.typing = Typing::Command(String::new()),
