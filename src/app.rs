@@ -4,8 +4,14 @@ use crate::{
 };
 use clap::Parser;
 use crossterm::{event, style::Stylize};
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, Visitor},
+    ser::SerializeTuple,
+    Deserialize, Serialize,
+};
 use std::fmt;
+
+type Fraction = fraction::GenericFraction<u8>;
 
 #[derive(Parser, Debug)]
 #[clap(name = "tab")]
@@ -29,41 +35,70 @@ impl Note {
     }
 }
 
-#[derive(Clone, Copy, Debug, serde_repr::Serialize_repr, serde_repr::Deserialize_repr)]
-#[repr(u8)]
-enum Duration {
-    Whole,
-    Half,
-    Quarter,
-    Eighth,
-    Sixteenth,
-    ThirtyTwoth,
-}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd)]
+struct Duration(Fraction);
 
 impl Duration {
-    fn split(&self) -> Result<Self> {
-        match self {
-            Self::Whole => Ok(Self::Half),
-            Self::Half => Ok(Self::Quarter),
-            Self::Quarter => Ok(Self::Eighth),
-            Self::Eighth => Ok(Self::Sixteenth),
-            Self::Sixteenth => Ok(Self::ThirtyTwoth),
-            _ => Err(Error::InvalidOp(format!(
-                "Cannot split duration ({self:?})"
-            ))),
-        }
+    fn new(a: u8, b: u8) -> Self {
+        Self(Fraction::new(a, b))
+    }
+
+    fn tuple(&self) -> (u8, u8) {
+        (*self.0.numer().unwrap(), *self.0.denom().unwrap())
+    }
+}
+
+impl Serialize for Duration {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_tuple(2)?;
+        seq.serialize_element(&self.0.numer())?;
+        seq.serialize_element(&self.0.denom())?;
+        seq.end()
+    }
+}
+
+struct DurationVisitor;
+
+impl<'de> Visitor<'de> for DurationVisitor {
+    type Value = (u8, u8);
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("two integers between 0 and 255")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        let a = seq.next_element()?.unwrap();
+        let b = seq.next_element()?.unwrap();
+        Ok((a, b))
+    }
+}
+
+impl<'de> Deserialize<'de> for Duration {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let t = deserializer.deserialize_tuple(2, DurationVisitor)?;
+        Ok(Duration::new(t.0, t.1))
     }
 }
 
 impl fmt::Display for Duration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Duration::Whole => f.write_str(" "),
-            Duration::Half => f.write_str("-"),
-            Duration::Quarter => f.write_str("1"),
-            Duration::Eighth => f.write_str("2"),
-            Duration::Sixteenth => f.write_str("3"),
-            Duration::ThirtyTwoth => f.write_str("4"),
+        match self.tuple() {
+            (1, 1) => f.write_str("   "),
+            (1, 2) => f.write_str(" - "),
+            (1, 4) => f.write_str(" 1 "),
+            (1, 8) => f.write_str(" 2 "),
+            (1, 16) => f.write_str(" 4 "),
+            (1, 32) => f.write_str(" 8 "),
+            _ => f.write_str(" ? "),
         }
     }
 }
@@ -73,14 +108,30 @@ impl std::str::FromStr for Duration {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "1" => Ok(Self::Whole),
-            "2" => Ok(Self::Half),
-            "4" => Ok(Self::Quarter),
-            "8" => Ok(Self::Eighth),
-            "16" => Ok(Self::Sixteenth),
-            "32" => Ok(Self::ThirtyTwoth),
+            "1" => Ok(Self::new(1, 1)),
+            "2" => Ok(Self::new(1, 2)),
+            "4" => Ok(Self::new(1, 4)),
+            "8" => Ok(Self::new(1, 8)),
+            "16" => Ok(Self::new(1, 16)),
+            "32" => Ok(Self::new(1, 32)),
             _ => Err(Error::InvalidOp(format!("Cannot parse '{s}' as Duration"))),
         }
+    }
+}
+
+impl std::ops::Add for Duration {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Duration(self.0 + rhs.0)
+    }
+}
+
+impl std::ops::Sub for Duration {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Duration(self.0 - rhs.0)
     }
 }
 
@@ -141,7 +192,7 @@ impl Track {
     fn new() -> Self {
         Self {
             string_count: 6,
-            beats: vec![Beat::new(Duration::Whole)],
+            beats: vec![Beat::new(Duration::new(1, 1))],
         }
     }
 }
@@ -296,23 +347,16 @@ impl App {
 
     fn reset_measure_indices(&mut self) {
         let mut v = Vec::new();
-        let mut dur = 0;
-        let measure_width = 32;
+        let mut dur = Duration::new(0, 1);
+        let measure_width = Duration::new(1, 1);
         for (i, beat) in self.sel.beats(&self.song).iter().enumerate() {
             if dur == measure_width {
                 v.push(i);
-                dur = 0;
+                dur = Duration::new(0, 1);
             } else if dur > measure_width {
-                dur -= measure_width;
+                dur = dur - measure_width;
             }
-            dur += match beat.dur {
-                Duration::Whole => 32,
-                Duration::Half => 16,
-                Duration::Quarter => 8,
-                Duration::Eighth => 4,
-                Duration::Sixteenth => 2,
-                Duration::ThirtyTwoth => 1,
-            };
+            dur = dur + beat.dur;
         }
         self.measure_indices = v;
     }
@@ -366,7 +410,7 @@ impl App {
         let track = self.sel.track(&self.song);
         win.moveto(0, 0)?;
         for i in range {
-            win.print(format!("~ {} ", track.beats[i].dur))?;
+            win.print(format!("~{}", track.beats[i].dur))?;
         }
         win.print("~")?.clear_eoline()?;
         Ok(())
@@ -461,14 +505,6 @@ impl App {
                 None => Err(Error::MalformedCmd(s_cmd)),
             },
             "b" => match cmd.get(1) {
-                Some(&"split") => {
-                    let index = self.sel.beat;
-                    let track = self.sel.track_mut(&mut self.song);
-                    let s_dur = track.beats[index].dur.split()?;
-                    track.beats[index].dur = s_dur;
-                    track.beats.insert(index, Beat::new(s_dur));
-                    Ok(format!("Split beat[{index}] into {s_dur:?}"))
-                }
                 Some(_) => Err(Error::UnknownCmd(s_cmd)),
                 None => Err(Error::MalformedCmd(s_cmd)),
             },
