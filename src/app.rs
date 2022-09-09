@@ -11,8 +11,8 @@ use std::fmt;
 #[clap(name = "tab")]
 #[clap(version, about, long_about = None)]
 struct Args {
-    #[clap(required = true, value_parser)]
-    path: String,
+    #[clap(value_parser)]
+    path: Option<String>,
 }
 
 type BeatRange = std::ops::Range<usize>;
@@ -325,13 +325,14 @@ impl App {
         }
     }
 
-    fn save_file(&self, path: String) -> Result<String> {
+    fn save_file(&mut self, path: String) -> Result<String> {
         let s = serde_json::to_string(&self.song).unwrap();
         std::fs::write(&path, s).unwrap();
+        self.song_path = Some(path.clone());
         Ok(format!("Saved to {path}"))
     }
 
-    fn try_save_file(&self, inp: Option<&&str>) -> Result<String> {
+    fn try_save_file(&mut self, inp: Option<&&str>) -> Result<String> {
         if let Some(path) = inp {
             self.save_file(path.to_string())
         } else {
@@ -348,7 +349,7 @@ impl App {
             self.song = serde_json::from_str(data.as_str()).unwrap();
             Ok(format!("Loaded {path}"))
         } else {
-            Err(Error::InvalidOp("Cannot read file '{path}'".into()))
+            Err(Error::InvalidOp(format!("Cannot read file '{path}'")))
         }
     }
 
@@ -642,7 +643,9 @@ impl App {
 
     pub fn run(mut self) -> Result<()> {
         let args = Args::parse();
-        if self.load_file(args.path).is_err() {}
+        self.song_path = args.path;
+        let _ = self.try_load_file(None);
+
         let mut win = window::Window::new()?;
         win.clear()?;
         let mut do_redraw = true;
