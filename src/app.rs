@@ -231,6 +231,7 @@ pub struct App {
     should_close: bool,
     song_path: Option<String>,
     song: Song,
+    scroll: usize,
     sel_track: usize,
     sel_beat: usize,
     sel_string: u16,
@@ -245,6 +246,7 @@ impl App {
             should_close: false,
             song_path: Some("test_song.json".into()),
             song: Song::new(),
+            scroll: 0,
             sel_track: 0,
             sel_beat: 0,
             sel_string: 0,
@@ -366,9 +368,8 @@ impl App {
     }
 
     fn visible_beat_range(&self, max: u16) -> BeatRange {
-        let start = 0;
         let len = (max as usize).min(self.beats().len());
-        start..start + len
+        self.scroll..(self.scroll + len).min(self.beats().len())
     }
 
     fn draw(&self, win: &mut window::Window, (w, _h): (u16, u16)) -> Result<()> {
@@ -440,10 +441,7 @@ impl App {
                     if let Ok(fret) = s.parse::<u32>() {
                         let string = self.sel_string;
                         self.beat_mut().set_note(string, fret);
-                        Ok(format!(
-                            "Note count : {}",
-                            self.beat().notes.len()
-                        ))
+                        Ok(format!("Note count : {}", self.beat().notes.len()))
                     } else {
                         Err(Error::UnknownCmd(s_cmd))
                     }
@@ -489,8 +487,7 @@ impl App {
                     }
                 }
                 (Ok(count), "b") => {
-                    if let Some(beat) = self.beats().get(self.sel_beat..self.sel_beat + count)
-                    {
+                    if let Some(beat) = self.beats().get(self.sel_beat..self.sel_beat + count) {
                         self.copy_buffer = Buffer::MultiBeat(beat.to_owned());
                         Ok("Beat(s) copied".into())
                     } else {
@@ -619,6 +616,16 @@ impl App {
                 event::KeyCode::Char('v') => self.paste_once(false),
                 event::KeyCode::Char('V') => self.paste_once(true),
                 event::KeyCode::Char(':') => self.typing = Typing::Command(String::new()),
+                event::KeyCode::Left => {
+                    if let Some(v) = self.scroll.checked_sub(1) {
+                        self.scroll = v
+                    }
+                }
+                event::KeyCode::Right => {
+                    if let Some(v) = self.scroll.checked_add(1) {
+                        self.scroll = v
+                    }
+                }
                 _ => {}
             }
         }
