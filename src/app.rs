@@ -697,6 +697,12 @@ impl App {
                 event::KeyCode::Char('v') => self.paste_once(false),
                 event::KeyCode::Char('V') => self.paste_once(true),
                 event::KeyCode::Char(':') => self.typing = Typing::Command(String::new()),
+                event::KeyCode::Char('i') => {
+                    let beat = self.sel.beat(&self.song).copy_duration();
+                    self.sel
+                        .beats_mut(&mut self.song)
+                        .insert(self.sel.beat, beat);
+                }
                 event::KeyCode::Left => {
                     if let Some(v) = self.sel.scroll.checked_sub(1) {
                         self.sel.scroll = v
