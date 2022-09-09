@@ -415,7 +415,7 @@ impl App {
     fn draw(&self, win: &mut window::Window, (w, _h): (u16, u16)) -> Result<()> {
         let track = self.sel.track(&self.song);
         win.moveto(0, 0)?;
-        let range = self.visible_beat_range(w / 4);
+        let range = self.visible_beat_range((w - 1) / 4);
         self.draw_durations(win, range.clone())?;
         for i in 0..track.string_count {
             self.draw_string(win, i, range.clone())?;
@@ -685,7 +685,10 @@ impl App {
                         Ok(true)
                     }
                 },
-                event::Event::Resize(..) => Ok(true),
+                event::Event::Resize(..) => {
+                    win.moveto(0, 0)?.clear()?;
+                    Ok(true)
+                }
                 _ => Ok(false),
             },
             Err(Error::NoEvent) => Ok(false),
