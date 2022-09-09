@@ -292,6 +292,51 @@ impl App {
         })
     }
 
+    fn save_file(&mut self, path: String) -> Result<String> {
+        let s = serde_json::to_string(&self.song).unwrap();
+        std::fs::write(&path, s).unwrap();
+        self.song_path = Some(path.clone());
+        Ok(format!("Saved to {path}"))
+    }
+
+    fn try_save_file(&mut self, inp: Option<&&str>) -> Result<String> {
+        if let Some(path) = inp {
+            self.save_file(path.to_string())
+        } else {
+            if let Some(path) = self.song_path.clone() {
+                self.save_file(path)
+            } else {
+                Err(Error::MalformedCmd("No default file to save to".into()))
+            }
+        }
+    }
+
+    fn load_file(&mut self, path: String) -> Result<String> {
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            self.song = serde_json::from_str(data.as_str()).unwrap();
+            Ok(format!("Loaded {path}"))
+        } else {
+            Err(Error::InvalidOp(format!("Cannot read file '{path}'")))
+        }
+    }
+
+    fn try_load_file(&mut self, inp: Option<&&str>) -> Result<String> {
+        if let Some(path) = inp {
+            self.load_file(path.to_string())
+        } else {
+            if let Some(path) = self.song_path.clone() {
+                self.load_file(path)
+            } else {
+                Err(Error::MalformedCmd("No default file to save to".into()))
+            }
+        }
+    }
+
+    fn visible_beat_range(&self, max: u16) -> BeatRange {
+        let num_beats = self.sel.beats(&self.song).len();
+        self.sel.scroll..(self.sel.scroll + max as usize).min(num_beats)
+    }
+
     fn draw_durations(&self, win: &mut window::Window, range: BeatRange) -> Result<()> {
         let track = self.sel.track(&self.song);
         win.moveto(0, 0)?;
@@ -338,51 +383,6 @@ impl App {
         }
     }
 
-    fn save_file(&mut self, path: String) -> Result<String> {
-        let s = serde_json::to_string(&self.song).unwrap();
-        std::fs::write(&path, s).unwrap();
-        self.song_path = Some(path.clone());
-        Ok(format!("Saved to {path}"))
-    }
-
-    fn try_save_file(&mut self, inp: Option<&&str>) -> Result<String> {
-        if let Some(path) = inp {
-            self.save_file(path.to_string())
-        } else {
-            if let Some(path) = self.song_path.clone() {
-                self.save_file(path)
-            } else {
-                Err(Error::MalformedCmd("No default file to save to".into()))
-            }
-        }
-    }
-
-    fn load_file(&mut self, path: String) -> Result<String> {
-        if let Ok(data) = std::fs::read_to_string(&path) {
-            self.song = serde_json::from_str(data.as_str()).unwrap();
-            Ok(format!("Loaded {path}"))
-        } else {
-            Err(Error::InvalidOp(format!("Cannot read file '{path}'")))
-        }
-    }
-
-    fn try_load_file(&mut self, inp: Option<&&str>) -> Result<String> {
-        if let Some(path) = inp {
-            self.load_file(path.to_string())
-        } else {
-            if let Some(path) = self.song_path.clone() {
-                self.load_file(path)
-            } else {
-                Err(Error::MalformedCmd("No default file to save to".into()))
-            }
-        }
-    }
-
-    fn visible_beat_range(&self, max: u16) -> BeatRange {
-        let num_beats = self.sel.beats(&self.song).len();
-        self.sel.scroll..(self.sel.scroll + max as usize).min(num_beats)
-    }
-
     fn draw(&self, win: &mut window::Window, (w, _h): (u16, u16)) -> Result<()> {
         let track = self.sel.track(&self.song);
         win.moveto(0, 0)?;
@@ -412,17 +412,13 @@ impl App {
         self.sel.beat = new;
     }
 
-    fn add_track(&mut self) {
-        self.song.tracks.push(Track::new());
-    }
-
-    fn process_command(&mut self, s_cmd: String) -> Result<String> {
+    fn proc_t_command(&mut self, s_cmd: String) -> Result<String> {
         let cmd: Vec<_> = s_cmd.split(' ').collect();
         match cmd[0] {
             "" => Ok(String::new()),
             "t" => match cmd.get(1) {
                 Some(&"add") => {
-                    self.add_track();
+                    self.song.tracks.push(Track::new());
                     Ok(format!("Added track [{}]", self.song.tracks.len() - 1))
                 }
                 Some(s) => {
@@ -469,7 +465,7 @@ impl App {
         }
     }
 
-    fn process_note_edit(&mut self, s_fret: String) -> Result<String> {
+    fn proc_t_note_edit(&mut self, s_fret: String) -> Result<String> {
         if let Ok(fret) = s_fret.parse() {
             let string = self.sel.string;
             self.sel.beat_mut(&mut self.song).set_note(string, fret);
@@ -481,7 +477,7 @@ impl App {
         }
     }
 
-    fn process_copy(&mut self, cmd: String) -> Result<String> {
+    fn proc_t_copy(&mut self, cmd: String) -> Result<String> {
         if cmd.len() == 0 {
             Ok(String::new())
         } else {
@@ -514,7 +510,7 @@ impl App {
         }
     }
 
-    fn process_delete(&mut self, cmd: String) -> Result<String> {
+    fn proc_t_delete(&mut self, cmd: String) -> Result<String> {
         if cmd.len() == 0 {
             Ok(String::new())
         } else {
@@ -541,7 +537,7 @@ impl App {
         }
     }
 
-    fn process_duration(&mut self, cmd: String) -> Result<String> {
+    fn proc_t_duration(&mut self, cmd: String) -> Result<String> {
         let dur: Duration = cmd.parse()?;
         self.sel.beat_mut(&mut self.song).dur = dur;
         Ok(format!("{dur:?}"))
@@ -549,11 +545,11 @@ impl App {
 
     fn process_typing(&mut self) -> Result<()> {
         let res = match self.typing.clone() {
-            Typing::Command(s) => self.process_command(s),
-            Typing::Note(s) => self.process_note_edit(s),
-            Typing::Copy(s) => self.process_copy(s),
-            Typing::Delete(s) => self.process_delete(s),
-            Typing::Duration(s) => self.process_duration(s),
+            Typing::Command(s) => self.proc_t_command(s),
+            Typing::Note(s) => self.proc_t_note_edit(s),
+            Typing::Copy(s) => self.proc_t_copy(s),
+            Typing::Delete(s) => self.proc_t_delete(s),
+            Typing::Duration(s) => self.proc_t_duration(s),
             Typing::None => panic!("App.typing hasn't been initiated"),
         };
         if let Err(e) = res {
