@@ -227,14 +227,53 @@ impl fmt::Debug for Buffer {
     }
 }
 
+struct Selected {
+    scroll: usize,
+    track: usize,
+    beat: usize,
+    string: u16,
+}
+
+impl Selected {
+    fn new() -> Self {
+        Self {
+            scroll: 0,
+            track: 0,
+            beat: 0,
+            string: 0,
+        }
+    }
+
+    fn track<'a>(&self, song: &'a Song) -> &'a Track {
+        &song.tracks[self.track]
+    }
+
+    fn track_mut<'a>(&self, song: &'a mut Song) -> &'a mut Track {
+        &mut song.tracks[self.track]
+    }
+
+    fn beats<'a>(&self, song: &'a Song) -> &'a Vec<Beat> {
+        &song.tracks[self.track].beats
+    }
+
+    fn beats_mut<'a>(&self, song: &'a mut Song) -> &'a mut Vec<Beat> {
+        &mut song.tracks[self.track].beats
+    }
+
+    fn beat<'a>(&self, song: &'a Song) -> &'a Beat {
+        &song.tracks[self.track].beats[self.beat]
+    }
+
+    fn beat_mut<'a>(&self, song: &'a mut Song) -> &'a mut Beat {
+        &mut song.tracks[self.track].beats[self.beat]
+    }
+}
+
 pub struct App {
     should_close: bool,
     song_path: Option<String>,
     song: Song,
-    scroll: usize,
-    sel_track: usize,
-    sel_beat: usize,
-    sel_string: u16,
+    sel: Selected,
     typing: Typing,
     typing_res: String,
     copy_buffer: Buffer,
@@ -246,42 +285,15 @@ impl App {
             should_close: false,
             song_path: Some("test_song.json".into()),
             song: Song::new(),
-            scroll: 0,
-            sel_track: 0,
-            sel_beat: 0,
-            sel_string: 0,
+            sel: Selected::new(),
             typing: Typing::None,
             typing_res: String::new(),
             copy_buffer: Buffer::Empty,
         })
     }
 
-    fn track(&self) -> &Track {
-        &self.song.tracks[self.sel_track]
-    }
-
-    fn track_mut(&mut self) -> &mut Track {
-        &mut self.song.tracks[self.sel_track]
-    }
-
-    fn beats(&self) -> &Vec<Beat> {
-        &self.song.tracks[self.sel_track].beats
-    }
-
-    fn beats_mut(&mut self) -> &mut Vec<Beat> {
-        &mut self.song.tracks[self.sel_track].beats
-    }
-
-    fn beat(&self) -> &Beat {
-        &self.song.tracks[self.sel_track].beats[self.sel_beat]
-    }
-
-    fn beat_mut(&mut self) -> &mut Beat {
-        &mut self.song.tracks[self.sel_track].beats[self.sel_beat]
-    }
-
     fn draw_durations(&self, win: &mut window::Window, range: BeatRange) -> Result<()> {
-        let track = self.track();
+        let track = self.sel.track(&self.song);
         win.moveto(0, 0)?;
         for i in range {
             win.print(format!("~ {} ", track.beats[i].dur))?;
@@ -291,8 +303,7 @@ impl App {
     }
 
     fn draw_string(&self, win: &mut window::Window, string: u16, range: BeatRange) -> Result<()> {
-        let track = self.track();
-        let sel_string = self.sel_string == string;
+        let track = self.sel.track(&self.song);
         win.moveto(0, string + 1)?;
         for i in range {
             win.print("―")?;
@@ -305,8 +316,8 @@ impl App {
             } else {
                 "―――".into()
             };
-            if self.sel_beat as usize == i {
-                win.print_styled(if sel_string {
+            if self.sel.beat == i {
+                win.print_styled(if self.sel.string == string {
                     inner.as_str().on_white().black()
                 } else {
                     inner.as_str().on_dark_grey().black()
@@ -368,12 +379,12 @@ impl App {
     }
 
     fn visible_beat_range(&self, max: u16) -> BeatRange {
-        let len = (max as usize).min(self.beats().len());
-        self.scroll..(self.scroll + len).min(self.beats().len())
+        let num_beats = self.sel.beats(&self.song).len();
+        self.sel.scroll..(self.sel.scroll + max as usize).min(num_beats)
     }
 
     fn draw(&self, win: &mut window::Window, (w, _h): (u16, u16)) -> Result<()> {
-        let track = self.track();
+        let track = self.sel.track(&self.song);
         win.moveto(0, 0)?;
         let range = self.visible_beat_range(w / 4);
         self.draw_durations(win, range.clone())?;
@@ -388,17 +399,17 @@ impl App {
     }
 
     fn seek_string(&mut self, dire: i16) {
-        let new = self.sel_string as i16 + dire;
-        self.sel_string = new.clamp(0, self.track().string_count as i16 - 1) as u16;
+        let new = self.sel.string as i16 + dire;
+        self.sel.string = new.clamp(0, self.sel.track(&self.song).string_count as i16 - 1) as u16;
     }
 
     fn seek_beat(&mut self, dire: isize) {
-        let new = (self.sel_beat as isize + dire).max(0) as usize;
-        let beats = self.beats_mut();
+        let new = (self.sel.beat as isize + dire).max(0) as usize;
+        let beats = self.sel.beats_mut(&mut self.song);
         while new >= beats.len() as usize {
             beats.push(beats.last().unwrap().copy_duration());
         }
-        self.sel_beat = new;
+        self.sel.beat = new;
     }
 
     fn add_track(&mut self) {
@@ -416,7 +427,7 @@ impl App {
                 }
                 Some(s) => {
                     if let Ok(index) = s.parse() {
-                        self.sel_track = index;
+                        self.sel.track = index;
                         Ok(format!("Switched to track [{index}]"))
                     } else {
                         Err(Error::UnknownCmd(s_cmd))
@@ -426,8 +437,8 @@ impl App {
             },
             "b" => match cmd.get(1) {
                 Some(&"split") => {
-                    let index = self.sel_beat;
-                    let track = self.track_mut();
+                    let index = self.sel.beat;
+                    let track = self.sel.track_mut(&mut self.song);
                     let s_dur = track.beats[index].dur.split()?;
                     track.beats[index].dur = s_dur;
                     track.beats.insert(index, Beat::new(s_dur));
@@ -439,9 +450,9 @@ impl App {
             "n" => match cmd.get(1) {
                 Some(s) => {
                     if let Ok(fret) = s.parse::<u32>() {
-                        let string = self.sel_string;
-                        self.beat_mut().set_note(string, fret);
-                        Ok(format!("Note count : {}", self.beat().notes.len()))
+                        let string = self.sel.string;
+                        self.sel.beat_mut(&mut self.song).set_note(string, fret);
+                        Ok(format!("Note count : {}", self.sel.beat(&self.song).notes.len()))
                     } else {
                         Err(Error::UnknownCmd(s_cmd))
                     }
@@ -460,8 +471,8 @@ impl App {
 
     fn process_note_edit(&mut self, s_fret: String) -> Result<String> {
         if let Ok(fret) = s_fret.parse() {
-            let string = self.sel_string;
-            self.beat_mut().set_note(string, fret);
+            let string = self.sel.string;
+            self.sel.beat_mut(&mut self.song).set_note(string, fret);
             Ok(format!("Set fret ({fret})"))
         } else {
             Err(Error::MalformedCmd(format!(
@@ -478,7 +489,7 @@ impl App {
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => {
-                    if let Some(note) = self.beat().get_note(self.sel_string) {
+                    if let Some(note) = self.sel.beat(&self.song).get_note(self.sel.string) {
                         self.copy_buffer = Buffer::Note(note.clone());
                         Ok("Note copied".into())
                     } else {
@@ -487,7 +498,7 @@ impl App {
                     }
                 }
                 (Ok(count), "b") => {
-                    if let Some(beat) = self.beats().get(self.sel_beat..self.sel_beat + count) {
+                    if let Some(beat) = self.sel.beats(&self.song).get(self.sel.beat..self.sel.beat + count) {
                         self.copy_buffer = Buffer::MultiBeat(beat.to_owned());
                         Ok("Beat(s) copied".into())
                     } else {
@@ -495,7 +506,7 @@ impl App {
                     }
                 }
                 (_, "b") => {
-                    self.copy_buffer = Buffer::Beat(self.beat().clone());
+                    self.copy_buffer = Buffer::Beat(self.sel.beat(&self.song).clone());
                     Ok("Beat copied".into())
                 }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
@@ -511,18 +522,18 @@ impl App {
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => {
-                    let string = self.sel_string;
-                    self.beat_mut().del_note(string);
+                    let string = self.sel.string;
+                    self.sel.beat_mut(&mut self.song).del_note(string);
                     Ok("Note deleted".into())
                 }
                 (Ok(count), "b") => {
-                    let beat = self.sel_beat;
-                    self.beats_mut().splice(beat..beat + count, []);
+                    let beat = self.sel.beat;
+                    self.sel.beats_mut(&mut self.song).splice(beat..beat + count, []);
                     Ok("Beat deleted".into())
                 }
                 (_, "b") => {
-                    let beat = self.sel_beat;
-                    self.beats_mut().remove(beat);
+                    let beat = self.sel.beat;
+                    self.sel.beats_mut(&mut self.song).remove(beat);
                     Ok("Beat deleted".into())
                 }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
@@ -532,7 +543,7 @@ impl App {
 
     fn process_duration(&mut self, cmd: String) -> Result<String> {
         let dur: Duration = cmd.parse()?;
-        self.beat_mut().dur = dur;
+        self.sel.beat_mut(&mut self.song).dur = dur;
         Ok(format!("{dur:?}"))
     }
 
@@ -560,26 +571,26 @@ impl App {
         match &self.copy_buffer {
             Buffer::Empty => {}
             Buffer::Note(note) => {
-                let string = self.sel_string;
+                let string = self.sel.string;
                 let fret = note.fret;
-                self.beat_mut().set_note(string, fret);
+                self.sel.beat_mut(&mut self.song).set_note(string, fret);
             }
             Buffer::Beat(beat) => {
-                let index = self.sel_beat;
+                let index = self.sel.beat;
                 let beat = beat.clone();
                 if in_place {
-                    self.beats_mut()[index] = beat;
+                    self.sel.beats_mut(&mut self.song)[index] = beat;
                 } else {
-                    self.beats_mut().insert(index, beat);
+                    self.sel.beats_mut(&mut self.song).insert(index, beat);
                 }
             }
             Buffer::MultiBeat(beats) => {
-                let index = self.sel_beat;
+                let index = self.sel.beat;
                 let src = beats.clone();
                 if in_place {
-                    self.beats_mut().remove(index);
+                    self.sel.beats_mut(&mut self.song).remove(index);
                 }
-                let dest = self.beats_mut();
+                let dest = self.sel.beats_mut(&mut self.song);
                 let after = dest.split_off(index);
                 dest.extend(src);
                 dest.extend(after);
@@ -617,13 +628,13 @@ impl App {
                 event::KeyCode::Char('V') => self.paste_once(true),
                 event::KeyCode::Char(':') => self.typing = Typing::Command(String::new()),
                 event::KeyCode::Left => {
-                    if let Some(v) = self.scroll.checked_sub(1) {
-                        self.scroll = v
+                    if let Some(v) = self.sel.scroll.checked_sub(1) {
+                        self.sel.scroll = v
                     }
                 }
                 event::KeyCode::Right => {
-                    if let Some(v) = self.scroll.checked_add(1) {
-                        self.scroll = v
+                    if let Some(v) = self.sel.scroll.checked_add(1) {
+                        self.sel.scroll = v
                     }
                 }
                 _ => {}
