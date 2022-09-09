@@ -277,6 +277,7 @@ pub struct App {
     typing: Typing,
     typing_res: String,
     copy_buffer: Buffer,
+    measure_indices: Vec<usize>,
 }
 
 impl App {
@@ -289,7 +290,31 @@ impl App {
             typing: Typing::None,
             typing_res: String::new(),
             copy_buffer: Buffer::Empty,
+            measure_indices: Vec::new(),
         })
+    }
+
+    fn reset_measure_indices(&mut self) {
+        let mut v = Vec::new();
+        let mut dur = 0;
+        let measure_width = 32;
+        for (i, beat) in self.sel.beats(&self.song).iter().enumerate() {
+            if dur == measure_width {
+                v.push(i);
+                dur = 0;
+            } else if dur > measure_width {
+                dur -= measure_width;
+            }
+            dur += match beat.dur {
+                Duration::Whole => 32,
+                Duration::Half => 16,
+                Duration::Quarter => 8,
+                Duration::Eighth => 4,
+                Duration::Sixteenth => 2,
+                Duration::ThirtyTwoth => 1,
+            };
+        }
+        self.measure_indices = v;
     }
 
     fn save_file(&mut self, path: String) -> Result<String> {
@@ -351,7 +376,11 @@ impl App {
         let track = self.sel.track(&self.song);
         win.moveto(0, string + 1)?;
         for i in range {
-            win.print("―")?;
+            win.print_styled(if self.measure_indices.contains(&i) {
+                "|".white()
+            } else {
+                "―".grey()
+            })?;
             let inner: String = if let Some(val) = track.beats[i].get_note(string) {
                 if val.fret > 999 {
                     "###".into()
@@ -365,7 +394,7 @@ impl App {
                 win.print_styled(if self.sel.string == string {
                     inner.as_str().on_white().black()
                 } else {
-                    inner.as_str().on_dark_grey().black()
+                    inner.as_str().on_grey().black()
                 })?;
             } else {
                 win.print(inner)?;
@@ -448,7 +477,10 @@ impl App {
                     if let Ok(fret) = s.parse::<u32>() {
                         let string = self.sel.string;
                         self.sel.beat_mut(&mut self.song).set_note(string, fret);
-                        Ok(format!("Note count : {}", self.sel.beat(&self.song).notes.len()))
+                        Ok(format!(
+                            "Note count : {}",
+                            self.sel.beat(&self.song).notes.len()
+                        ))
                     } else {
                         Err(Error::UnknownCmd(s_cmd))
                     }
@@ -494,7 +526,11 @@ impl App {
                     }
                 }
                 (Ok(count), "b") => {
-                    if let Some(beat) = self.sel.beats(&self.song).get(self.sel.beat..self.sel.beat + count) {
+                    if let Some(beat) = self
+                        .sel
+                        .beats(&self.song)
+                        .get(self.sel.beat..self.sel.beat + count)
+                    {
                         self.copy_buffer = Buffer::MultiBeat(beat.to_owned());
                         Ok("Beat(s) copied".into())
                     } else {
@@ -524,7 +560,9 @@ impl App {
                 }
                 (Ok(count), "b") => {
                     let beat = self.sel.beat;
-                    self.sel.beats_mut(&mut self.song).splice(beat..beat + count, []);
+                    self.sel
+                        .beats_mut(&mut self.song)
+                        .splice(beat..beat + count, []);
                     Ok("Beat deleted".into())
                 }
                 (_, "b") => {
@@ -665,6 +703,7 @@ impl App {
         let mut do_redraw = true;
         while !self.should_close {
             if do_redraw {
+                self.reset_measure_indices();
                 self.draw(&mut win, crossterm::terminal::size().unwrap())?;
             }
             do_redraw = self.proc_event(&mut win)?;
