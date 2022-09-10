@@ -153,7 +153,7 @@ impl App {
             }
             Action::SetNote { cur, new, .. } => {
                 if let Some(fret) = *new {
-                    cur.beat_mut(&mut self.song).set_note(cur.string, fret);
+                    self.set_note(cur.beat, cur.string, fret);
                     Ok("Set note".into())
                 } else {
                     self.clear_note(cur.beat, cur.string);
@@ -161,7 +161,7 @@ impl App {
                 }
             }
             Action::ClearBeat { cur, .. } => {
-                cur.beat_mut(&mut self.song).notes = Vec::new();
+                self.clear_beat(cur.beat);
                 Ok("Clear beat".into())
             }
         }
@@ -175,7 +175,7 @@ impl App {
             }
             Action::SetNote { cur, old, new } => {
                 if let Some(fret) = *old {
-                    cur.beat_mut(&mut self.song).set_note(cur.string, fret);
+                    self.set_note(cur.beat, cur.string, fret);
                 } else {
                     self.clear_note(cur.beat, cur.string);
                 }
@@ -424,7 +424,11 @@ impl App {
             .splice(index..index + count, []);
     }
 
-    // Duration functions
+    // Set functions
+
+    fn set_note(&mut self, index: usize, string: u16, fret: u32) {
+        self.sel.beat_i_mut(&mut self.song, index).set_note(string, fret);
+    }
 
     fn set_duration(&mut self, index: usize, dur: Duration) {
         self.sel.beat_i_mut(&mut self.song, index).dur = dur;
