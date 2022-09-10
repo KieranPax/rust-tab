@@ -594,8 +594,8 @@ impl App {
         win.clear()?;
         self.reset_sdim(crossterm::terminal::size().unwrap());
         let mut do_redraw = true;
+        self.sel.track_mut(&mut self.song).update_measures();
         while !self.should_close {
-            self.sel.track_mut(&mut self.song).update_measures();
             if do_redraw {
                 self.draw(&mut win)?;
             }

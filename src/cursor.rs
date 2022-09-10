@@ -80,6 +80,7 @@ impl Cursor {
 
     pub fn set_duration(&self, song: &mut Song, dur: Duration) {
         self.beat_mut(song).dur = dur;
+        self.track_mut(song).update_measures();
     }
 
     pub fn set_note(&self, song: &mut Song, fret: u16) {
@@ -107,11 +108,13 @@ impl Cursor {
 
     pub fn delete_beat(&self, song: &mut Song) {
         self.beats_mut(song).remove(self.beat);
+        self.track_mut(song).update_measures();
     }
 
     pub fn delete_beats(&self, song: &mut Song, count: usize) {
         self.beats_mut(song)
             .splice(self.beat..self.beat + count, []);
+        self.track_mut(song).update_measures();
     }
 
     pub fn copy_note(&self, song: &mut Song, string: u16) -> Buffer {
@@ -144,6 +147,7 @@ impl Cursor {
         } else {
             self.beats_mut(song).insert(self.beat, beat);
         }
+        self.track_mut(song).update_measures();
     }
 
     fn paste_multi_beat(&self, song: &mut Song, in_place: bool, src: Vec<Beat>) {
@@ -154,6 +158,7 @@ impl Cursor {
         let after = dest.split_off(self.beat);
         dest.extend(src);
         dest.extend(after);
+        self.track_mut(song).update_measures();
     }
 
     pub fn paste_once(&mut self, song: &mut Song, buf: &Buffer, in_place: bool) {
