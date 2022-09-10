@@ -148,20 +148,20 @@ impl App {
     fn apply_action(&mut self, action: std::rc::Rc<Action>) -> Result<String> {
         match &*action {
             Action::SetDuration { cur, new, .. } => {
-                self.set_duration(cur.beat, *new);
+                cur.set_duration(&mut self.song, *new);
                 Ok("Set duration".into())
             }
             Action::SetNote { cur, new, .. } => {
                 if let Some(fret) = *new {
-                    self.set_note(cur.beat, cur.string, fret);
+                    cur.set_note(&mut self.song, fret);
                     Ok("Set note".into())
                 } else {
-                    self.clear_note(cur.beat, cur.string);
+                    cur.clear_note(&mut self.song);
                     Ok("Delete note".into())
                 }
             }
             Action::ClearBeat { cur, .. } => {
-                self.clear_beat(cur.beat);
+                cur.clear_beat(&mut self.song);
                 Ok("Clear beat".into())
             }
         }
@@ -170,14 +170,14 @@ impl App {
     fn undo_action(&mut self, action: std::rc::Rc<Action>) -> Result<String> {
         match &*action {
             Action::SetDuration { cur, old, .. } => {
-                self.set_duration(cur.beat, *old);
+                cur.set_duration(&mut self.song, *old);
                 Ok("Undo set duration".into())
             }
             Action::SetNote { cur, old, new } => {
                 if let Some(fret) = *old {
-                    self.set_note(cur.beat, cur.string, fret);
+                    cur.set_note(&mut self.song, fret);
                 } else {
-                    self.clear_note(cur.beat, cur.string);
+                    cur.clear_note(&mut self.song);
                 }
                 if new.is_none() {
                     Ok("Undo delete note".into())
@@ -186,7 +186,7 @@ impl App {
                 }
             }
             Action::ClearBeat { cur, old } => {
-                cur.beat_mut(&mut self.song).notes = old.clone();
+                cur.set_notes(&mut self.song, old.clone());
                 Ok("Undo clear beat".into())
             }
         }
@@ -397,14 +397,6 @@ impl App {
 
     // Clear functions
 
-    fn clear_note(&mut self, index: usize, string: u16) {
-        self.sel.beat_i_mut(&mut self.song, index).del_note(string);
-    }
-
-    fn clear_beat(&mut self, index: usize) {
-        self.sel.beat_i_mut(&mut self.song, index).notes.clear();
-    }
-
     fn clear_beats(&mut self, start: usize, count: usize) {
         let beats = self.sel.beats_mut(&mut self.song);
         for i in start..start + count {
@@ -422,16 +414,6 @@ impl App {
         self.sel
             .beats_mut(&mut self.song)
             .splice(index..index + count, []);
-    }
-
-    // Set functions
-
-    fn set_note(&mut self, index: usize, string: u16, fret: u16) {
-        self.sel.beat_i_mut(&mut self.song, index).set_note(string, fret);
-    }
-
-    fn set_duration(&mut self, index: usize, dur: Duration) {
-        self.sel.beat_i_mut(&mut self.song, index).dur = dur;
     }
 
     // Command processors

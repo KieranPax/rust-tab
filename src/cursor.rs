@@ -1,4 +1,4 @@
-use crate::song::{Beat, Song, Track};
+use crate::{song::{Beat, Song, Track, Note}, dur::Duration};
 
 #[derive(Clone)]
 pub struct Cursor {
@@ -80,5 +80,25 @@ impl Cursor {
         if self.scroll + s_bwidth - 1 < self.beat {
             self.scroll = self.beat - (s_bwidth - 1);
         }
+    }
+
+    pub fn set_duration(&self, song: &mut Song, dur: Duration) {
+        self.beat_mut(song).dur = dur;
+    }
+
+    pub fn set_note(&self, song: &mut Song, fret: u16) {
+        self.beat_mut(song).set_note(self.string, fret);
+    }
+
+    pub fn set_notes(&self, song: &mut Song, notes: Vec<Note>) {
+        self.beat_mut(song).notes = notes;
+    }
+
+    pub fn clear_note(&self, song: &mut Song) {
+        self.beat_mut(song).del_note(self.string);
+    }
+
+    pub fn clear_beat(&self, song: &mut Song) {
+        self.beat_mut(song).notes.clear();
     }
 }
