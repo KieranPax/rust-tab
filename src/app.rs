@@ -2,7 +2,7 @@ use crate::{
     cursor::Cursor,
     dur::Duration,
     error::{Error, Result},
-    history::{Action, ActionData, History},
+    history::{Action, History},
     song::{Beat, Note, Song, Track},
     window,
 };
@@ -147,44 +147,39 @@ impl App {
 
     fn apply_action(&mut self, action: std::rc::Rc<Action>) -> Result<String> {
         match &*action {
-            Action::SetDuration(ActionData { cursor, new, .. }) => {
-                cursor.beat_mut(&mut self.song).dur = *new;
+            Action::SetDuration { cur, new, .. } => {
+                self.set_duration(cur.beat, *new);
                 Ok(format!("{new:?}"))
             }
-            Action::SetNote(ActionData { cursor, new, .. }) => {
-                cursor
-                    .beat_mut(&mut self.song)
-                    .set_note(cursor.string, *new);
-                Ok(format!("Set fret ({new})"))
-            }
-            Action::DelNote(ActionData { cursor, .. }) => {
-                self.clear_note(cursor.beat, cursor.string);
-                Ok("Note deleted".into())
+            Action::SetNote { cur, new, .. } => {
+                if let Some(fret) = *new {
+                    cur.beat_mut(&mut self.song).set_note(cur.string, fret);
+                    Ok(format!("Set note ({fret})"))
+                } else {
+                    self.clear_note(cur.beat, cur.string);
+                    Ok(format!("Delete note"))
+                }
             }
         }
     }
 
     fn undo_action(&mut self, action: std::rc::Rc<Action>) -> Result<String> {
         match &*action {
-            Action::SetDuration(ActionData { cursor, old, .. }) => {
-                cursor.beat_mut(&mut self.song).dur = *old;
+            Action::SetDuration { cur, old, .. } => {
+                self.set_duration(cur.beat, *old);
                 Ok(format!("Undo set duration"))
             }
-            Action::SetNote(ActionData { cursor, old, .. }) => {
+            Action::SetNote { cur, old, new } => {
                 if let Some(fret) = *old {
-                    cursor
-                        .beat_mut(&mut self.song)
-                        .set_note(cursor.string, fret);
+                    cur.beat_mut(&mut self.song).set_note(cur.string, fret);
                 } else {
-                    self.clear_note(cursor.beat, cursor.string);
+                    self.clear_note(cur.beat, cur.string);
                 }
-                Ok(format!("Undo set note"))
-            }
-            Action::DelNote(ActionData { cursor, old, .. }) => {
-                cursor
-                    .beat_mut(&mut self.song)
-                    .set_note(cursor.string, *old);
-                Ok(format!("Undo delete note"))
+                if new.is_none() {
+                    Ok(format!("Undo delete note"))
+                } else {
+                    Ok(format!("Undo set note"))
+                }
             }
         }
     }
@@ -479,12 +474,14 @@ impl App {
 
     fn proc_t_note_edit(&mut self, s_fret: String) -> Result<String> {
         if let Ok(fret) = s_fret.parse() {
-            let old = if let Some(old) = self.sel.beat(&self.song).get_note(self.sel.string) {
-                Some(old.fret)
-            } else {
-                None
-            };
-            self.push_action(Action::set_note(self.sel.clone(), old, fret))
+            self.push_action(Action::set_note(
+                self.sel.clone(),
+                self.sel
+                    .beat(&self.song)
+                    .get_note(self.sel.string)
+                    .map(|n| n.fret),
+                Some(fret),
+            ))
         } else {
             Err(Error::MalformedCmd(format!(
                 "Cannot parse {s_fret:?} as int"
@@ -529,13 +526,14 @@ impl App {
             let (a, b) = cmd.split_at(cmd.len() - 1);
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
-                (_, "n") => {
-                    if let Some(old) = self.sel.beat(&self.song).get_note(self.sel.string) {
-                        self.push_action(Action::del_note(self.sel.clone(), old.fret))
-                    } else {
-                        Ok(String::new())
-                    }
-                }
+                (_, "n") => self.push_action(Action::set_note(
+                    self.sel.clone(),
+                    self.sel
+                        .beat(&self.song)
+                        .get_note(self.sel.string)
+                        .map(|n| n.fret),
+                    None,
+                )),
                 (Ok(count), "b") => {
                     self.delete_beats(self.sel.beat, count);
                     Ok(format!("{count} beats deleted"))
