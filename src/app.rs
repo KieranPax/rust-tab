@@ -279,21 +279,7 @@ impl App {
         })
     }
 
-    fn reset_measure_indices(&mut self) {
-        let mut v = Vec::new();
-        let mut dur = Duration::new(0, 1);
-        let measure_width = Duration::new(1, 1);
-        for (i, beat) in self.sel.beats(&self.song).iter().enumerate() {
-            if dur == measure_width {
-                v.push(i);
-                dur = Duration::new(0, 1);
-            } else if dur > measure_width {
-                dur = dur - measure_width;
-            }
-            dur = dur + beat.dur;
-        }
-        self.measure_indices = v;
-    }
+    // IO functions
 
     fn save_file(&mut self, path: String) -> Result<String> {
         let s = serde_json::to_string(&self.song).unwrap();
@@ -335,10 +321,79 @@ impl App {
         }
     }
 
+    // Copy paste functions
+
+    fn paste_once(&mut self, in_place: bool) {
+        match &self.copy_buffer {
+            Buffer::Empty => {}
+            Buffer::Note(note) => {
+                let string = self.sel.string;
+                let fret = note.fret;
+                self.sel.beat_mut(&mut self.song).set_note(string, fret);
+            }
+            Buffer::Beat(beat) => {
+                let index = self.sel.beat;
+                let beat = beat.clone();
+                if in_place {
+                    self.sel.beats_mut(&mut self.song)[index] = beat;
+                } else {
+                    self.sel.beats_mut(&mut self.song).insert(index, beat);
+                }
+            }
+            Buffer::MultiBeat(beats) => {
+                let index = self.sel.beat;
+                let src = beats.clone();
+                if in_place {
+                    self.sel.beats_mut(&mut self.song).remove(index);
+                }
+                let dest = self.sel.beats_mut(&mut self.song);
+                let after = dest.split_off(index);
+                dest.extend(src);
+                dest.extend(after);
+            }
+        }
+    }
+
+    // Drawing util functions
+
+    fn reset_measure_indices(&mut self) {
+        let mut v = Vec::new();
+        let mut dur = Duration::new(0, 1);
+        let measure_width = Duration::new(1, 1);
+        for (i, beat) in self.sel.beats(&self.song).iter().enumerate() {
+            if dur == measure_width {
+                v.push(i);
+                dur = Duration::new(0, 1);
+            } else if dur > measure_width {
+                dur = dur - measure_width;
+            }
+            dur = dur + beat.dur;
+        }
+        self.measure_indices = v;
+    }
+
+    fn reset_sdim(&mut self, (w, h): (u16, u16)) {
+        self.s_bwidth = ((w - 1) / 4) as usize;
+        self.s_height = h;
+    }
+
     fn visible_beat_range(&self) -> BeatRange {
         let num_beats = self.sel.beats(&self.song).len();
         self.sel.scroll..(self.sel.scroll + self.s_bwidth).min(num_beats)
     }
+
+    fn gen_status_msg(&self) -> String {
+        if self.typing.is_none() {
+            format!(
+                "{} | buffer : {:?}    {} {}",
+                self.typing_res, self.copy_buffer, self.sel.beat, self.sel.scroll
+            )
+        } else {
+            format!("{} $ buffer : {:?}", self.typing, self.copy_buffer)
+        }
+    }
+
+    // Draw functions
 
     fn draw_durations(&self, win: &mut window::Window, range: BeatRange) -> Result<()> {
         let track = self.sel.track(&self.song);
@@ -382,17 +437,6 @@ impl App {
         Ok(())
     }
 
-    fn gen_status_msg(&self) -> String {
-        if self.typing.is_none() {
-            format!(
-                "{} | buffer : {:?}    {} {}",
-                self.typing_res, self.copy_buffer, self.sel.beat, self.sel.scroll
-            )
-        } else {
-            format!("{} $ buffer : {:?}", self.typing, self.copy_buffer)
-        }
-    }
-
     fn draw(&self, win: &mut window::Window) -> Result<()> {
         let track = self.sel.track(&self.song);
         win.moveto(0, 0)?;
@@ -407,6 +451,8 @@ impl App {
             .update()?;
         Ok(())
     }
+
+    // Command processors
 
     fn proc_t_command(&mut self, s_cmd: String) -> Result<String> {
         let cmd: Vec<_> = s_cmd.split(' ').collect();
@@ -569,6 +615,8 @@ impl App {
         }
     }
 
+    // Raw event processors
+
     fn process_typing(&mut self) -> Result<()> {
         let res = match self.typing.clone() {
             Typing::Command(s) => self.proc_t_command(s),
@@ -587,37 +635,6 @@ impl App {
             self.typing = Typing::None;
             self.typing_res = res.unwrap();
             Ok(())
-        }
-    }
-
-    fn paste_once(&mut self, in_place: bool) {
-        match &self.copy_buffer {
-            Buffer::Empty => {}
-            Buffer::Note(note) => {
-                let string = self.sel.string;
-                let fret = note.fret;
-                self.sel.beat_mut(&mut self.song).set_note(string, fret);
-            }
-            Buffer::Beat(beat) => {
-                let index = self.sel.beat;
-                let beat = beat.clone();
-                if in_place {
-                    self.sel.beats_mut(&mut self.song)[index] = beat;
-                } else {
-                    self.sel.beats_mut(&mut self.song).insert(index, beat);
-                }
-            }
-            Buffer::MultiBeat(beats) => {
-                let index = self.sel.beat;
-                let src = beats.clone();
-                if in_place {
-                    self.sel.beats_mut(&mut self.song).remove(index);
-                }
-                let dest = self.sel.beats_mut(&mut self.song);
-                let after = dest.split_off(index);
-                dest.extend(src);
-                dest.extend(after);
-            }
         }
     }
 
@@ -697,10 +714,7 @@ impl App {
         }
     }
 
-    fn reset_sdim(&mut self, (w, h): (u16, u16)) {
-        self.s_bwidth = ((w - 1) / 4) as usize;
-        self.s_height = h;
-    }
+    // Main loop
 
     pub fn run(mut self) -> Result<()> {
         let args = Args::parse();
