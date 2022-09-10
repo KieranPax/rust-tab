@@ -46,14 +46,6 @@ impl Cursor {
         &mut song.tracks[self.track].beats[self.beat]
     }
 
-    pub fn beat_i<'a>(&self, song: &'a Song, index: usize) -> &'a Beat {
-        &song.tracks[self.track].beats[index]
-    }
-
-    pub fn beat_i_mut<'a>(&self, song: &'a mut Song, index: usize) -> &'a mut Beat {
-        &mut song.tracks[self.track].beats[index]
-    }
-
     pub fn seek_string(&mut self, song: &Song, dire: i16) {
         let new = self.string as i16 + dire;
         self.string = new.clamp(0, self.track(song).string_count as i16 - 1) as u16;
@@ -123,7 +115,7 @@ impl Cursor {
     }
 
     pub fn copy_note(&self, song: &mut Song, string: u16) -> Buffer {
-        if let Some(note) = self.beat_i(song, self.beat).get_note(string) {
+        if let Some(note) = self.beat(song).get_note(string) {
             Buffer::Note(note.clone())
         } else {
             Buffer::Empty
@@ -131,7 +123,7 @@ impl Cursor {
     }
 
     pub fn copy_beat(&self, song: &mut Song) -> Buffer {
-        Buffer::Beat(self.beat_i(song, self.beat).clone())
+        Buffer::Beat(self.beat(song).clone())
     }
 
     pub fn copy_beats(&self, song: &mut Song, count: usize) -> Buffer {
