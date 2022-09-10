@@ -1,4 +1,7 @@
-use crate::{song::{Beat, Song, Track, Note}, dur::Duration};
+use crate::{
+    dur::Duration,
+    song::{Beat, Note, Song, Track},
+};
 
 #[derive(Clone)]
 pub struct Cursor {
@@ -100,5 +103,21 @@ impl Cursor {
 
     pub fn clear_beat(&self, song: &mut Song) {
         self.beat_mut(song).notes.clear();
+    }
+
+    pub fn clear_beats(&self, song: &mut Song, count: usize) {
+        let beats = self.beats_mut(song);
+        for i in self.beat..self.beat + count {
+            beats[i].notes.clear()
+        }
+    }
+
+    pub fn delete_beat(&self, song: &mut Song) {
+        self.beats_mut(song).remove(self.beat);
+    }
+
+    pub fn delete_beats(&self, song: &mut Song, count: usize) {
+        self.beats_mut(song)
+            .splice(self.beat..self.beat + count, []);
     }
 }

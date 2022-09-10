@@ -395,27 +395,6 @@ impl App {
         }
     }
 
-    // Clear functions
-
-    fn clear_beats(&mut self, start: usize, count: usize) {
-        let beats = self.sel.beats_mut(&mut self.song);
-        for i in start..start + count {
-            beats[i].notes.clear()
-        }
-    }
-
-    // Delete functions
-
-    fn delete_beat(&mut self, index: usize) {
-        self.sel.beats_mut(&mut self.song).remove(index);
-    }
-
-    fn delete_beats(&mut self, index: usize, count: usize) {
-        self.sel
-            .beats_mut(&mut self.song)
-            .splice(index..index + count, []);
-    }
-
     // Command processors
 
     fn proc_t_command(&mut self, s_cmd: String) -> Result<String> {
@@ -529,11 +508,11 @@ impl App {
                     None,
                 )),
                 (Ok(count), "b") => {
-                    self.delete_beats(self.sel.beat, count);
+                    self.sel.delete_beats(&mut self.song, count);
                     Ok(format!("{count} beats deleted"))
                 }
                 (_, "b") => {
-                    self.delete_beat(self.sel.beat);
+                    self.sel.delete_beat(&mut self.song);
                     Ok("Beat deleted".into())
                 }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
@@ -566,17 +545,13 @@ impl App {
                     None,
                 )),
                 (Ok(count), "b") => {
-                    self.clear_beats(self.sel.beat, count);
+                    self.sel.clear_beats(&mut self.song, count);
                     Ok("{count} beats cleared".into())
                 }
                 (_, "b") => self.push_action(Action::clear_beat(
                     self.sel.clone(),
                     self.sel.beat(&self.song).notes.clone(),
                 )),
-                // {
-                //     self.clear_beat(self.sel.beat);
-                //     Ok("Beat cleared".into())
-                // }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
             }
         }
