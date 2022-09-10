@@ -1,9 +1,10 @@
 use crate::{
+    buffer::Buffer,
     cursor::Cursor,
     dur::Duration,
     error::{Error, Result},
     history::{Action, History},
-    song::{Beat, Note, Song, Track},
+    song::{Beat, Song, Track},
     window,
 };
 use clap::Parser;
@@ -74,24 +75,6 @@ impl fmt::Display for Typing {
             Typing::Delete(text) => f.write_fmt(format_args!("delete:{text}")),
             Typing::Duration(text) => f.write_fmt(format_args!("duration:{text}")),
             Typing::Clear(text) => f.write_fmt(format_args!("clean:{text}")),
-        }
-    }
-}
-
-enum Buffer {
-    Empty,
-    Note(Note),
-    Beat(Beat),
-    MultiBeat(Vec<Beat>),
-}
-
-impl fmt::Debug for Buffer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Empty => write!(f, "Empty"),
-            Self::Note(_) => write!(f, "Note"),
-            Self::Beat(_) => write!(f, "Beat"),
-            Self::MultiBeat(_) => write!(f, "MultiBeat"),
         }
     }
 }
