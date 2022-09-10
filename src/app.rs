@@ -325,7 +325,7 @@ impl App {
         }
     }
 
-    // Copy paste functions
+    // Paste functions
 
     fn paste_note(&mut self, string: u16, fret: u32) {
         self.sel.beat_mut(&mut self.song).set_note(string, fret);
@@ -458,7 +458,29 @@ impl App {
         Ok(())
     }
 
-    // Sub-command functions
+    // Copy functions
+
+    fn copy_note(&self, index: usize, string: u16) -> Buffer {
+        if let Some(note) = self.sel.beats(&self.song)[index].get_note(string) {
+            Buffer::Note(note.clone())
+        } else {
+            Buffer::Empty
+        }
+    }
+
+    fn copy_beat(&self, index: usize) -> Buffer {
+        Buffer::Beat(self.sel.beats(&self.song)[index].clone())
+    }
+
+    fn copy_beats(&self, index: usize, count: usize) -> Buffer {
+        if let Some(beat) = self.sel.beats(&self.song).get(index..index + count) {
+            Buffer::MultiBeat(beat.to_owned())
+        } else {
+            Buffer::Empty
+        }
+    }
+
+    // Clear functions
 
     fn clear_note(&mut self, index: usize, string: u16) {
         self.sel.beats_mut(&mut self.song)[index].del_note(string);
@@ -545,28 +567,21 @@ impl App {
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => {
-                    if let Some(note) = self.sel.beat(&self.song).get_note(self.sel.string) {
-                        self.copy_buffer = Buffer::Note(note.clone());
-                        Ok("Note copied".into())
-                    } else {
-                        self.copy_buffer = Buffer::Empty;
-                        Err(Error::InvalidOp("No note selected".into()))
+                    self.copy_buffer = self.copy_note(self.sel.beat, self.sel.string);
+                    match &self.copy_buffer {
+                        Buffer::Note(_) => Ok("Note copied".into()),
+                        _ => Err(Error::InvalidOp("No note selected".into())),
                     }
                 }
                 (Ok(count), "b") => {
-                    if let Some(beat) = self
-                        .sel
-                        .beats(&self.song)
-                        .get(self.sel.beat..self.sel.beat + count)
-                    {
-                        self.copy_buffer = Buffer::MultiBeat(beat.to_owned());
-                        Ok("Beat(s) copied".into())
-                    } else {
-                        Err(Error::InvalidOp("Copy range out of range".into()))
+                    self.copy_buffer = self.copy_beats(self.sel.beat, count);
+                    match &self.copy_buffer {
+                        Buffer::MultiBeat(_) => Ok(format!("{count} Beats copied")),
+                        _ => Err(Error::InvalidOp("Copy range out of range".into())),
                     }
                 }
                 (_, "b") => {
-                    self.copy_buffer = Buffer::Beat(self.sel.beat(&self.song).clone());
+                    self.copy_buffer = self.copy_beat(self.sel.beat);
                     Ok("Beat copied".into())
                 }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
