@@ -132,7 +132,7 @@ impl App {
         match &*action {
             Action::SetDuration { cur, new, .. } => {
                 cur.set_duration(&mut self.song, *new);
-                Ok("Set duration".into())
+                Ok(format!("Set duration {}/{}", new.num(), new.dem()))
             }
             Action::SetNote { cur, new, .. } => {
                 if let Some(fret) = *new {
@@ -146,6 +146,10 @@ impl App {
             Action::ClearBeat { cur, .. } => {
                 cur.clear_beat(&mut self.song);
                 Ok("Clear beat".into())
+            }
+            Action::DeleteBeat { cur, .. } => {
+                cur.delete_beat(&mut self.song);
+                Ok("Delete beat".into())
             }
         }
     }
@@ -171,6 +175,10 @@ impl App {
             Action::ClearBeat { cur, old } => {
                 cur.set_notes(&mut self.song, old.clone());
                 Ok("Undo clear beat".into())
+            }
+            Action::DeleteBeat { cur, old } => {
+                cur.paste_beat(&mut self.song, false, old.clone());
+                Ok("Undo delete beat".into())
             }
         }
     }
@@ -439,10 +447,10 @@ impl App {
                     self.sel.delete_beats(&mut self.song, count);
                     Ok(format!("{count} beats deleted"))
                 }
-                (_, "b") => {
-                    self.sel.delete_beat(&mut self.song);
-                    Ok("Beat deleted".into())
-                }
+                (_, "b") => self.push_action(Action::delete_beat(
+                    self.sel.clone(),
+                    self.sel.beat(&self.song).clone(),
+                )),
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
             }
         }

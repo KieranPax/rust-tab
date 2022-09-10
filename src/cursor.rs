@@ -137,11 +137,11 @@ impl Cursor {
         }
     }
 
-    fn paste_note(&self, song: &mut Song, fret: u16) {
+    pub fn paste_note(&self, song: &mut Song, fret: u16) {
         self.beat_mut(song).set_note(self.string, fret);
     }
 
-    fn paste_beat(&self, song: &mut Song, in_place: bool, beat: Beat) {
+    pub fn paste_beat(&self, song: &mut Song, in_place: bool, beat: Beat) {
         if in_place {
             self.beats_mut(song)[self.beat] = beat;
         } else {
@@ -150,7 +150,7 @@ impl Cursor {
         self.track_mut(song).update_measures();
     }
 
-    fn paste_multi_beat(&self, song: &mut Song, in_place: bool, src: Vec<Beat>) {
+    pub fn paste_multi_beat(&self, song: &mut Song, in_place: bool, src: Vec<Beat>) {
         if in_place {
             self.beats_mut(song).remove(self.beat);
         }
@@ -161,7 +161,7 @@ impl Cursor {
         self.track_mut(song).update_measures();
     }
 
-    pub fn paste_once(&mut self, song: &mut Song, buf: &Buffer, in_place: bool) {
+    pub fn paste_once(&self, song: &mut Song, buf: &Buffer, in_place: bool) {
         match buf {
             Buffer::Empty => {}
             Buffer::Note(n) => self.paste_note(song, n.fret),
