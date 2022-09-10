@@ -23,12 +23,20 @@ impl Duration {
         Self(Fraction::new(a, b))
     }
 
+    pub fn num(&self) -> u8 {
+        *self.0.numer().unwrap()
+    }
+
+    pub fn dem(&self) -> u8 {
+        *self.0.denom().unwrap()
+    }
+
     pub fn tuple(&self) -> (u8, u8) {
-        (*self.0.numer().unwrap(), *self.0.denom().unwrap())
+        (self.num(), self.dem())
     }
 
     pub fn dotted(&self) -> Self {
-        Self::new(self.0.numer().unwrap() * 3, self.0.denom().unwrap() * 2)
+        Self::new(self.num() * 3, self.dem() * 2)
     }
 
     pub fn dur_icon(&self) -> &'static str {
@@ -91,8 +99,8 @@ impl Serialize for Duration {
         S: serde::Serializer,
     {
         let mut seq = serializer.serialize_tuple(2)?;
-        seq.serialize_element(&self.0.numer())?;
-        seq.serialize_element(&self.0.denom())?;
+        seq.serialize_element(&self.num())?;
+        seq.serialize_element(&self.dem())?;
         seq.end()
     }
 }
