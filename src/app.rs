@@ -241,6 +241,8 @@ pub struct App {
     typing_res: String,
     copy_buffer: Buffer,
     measure_indices: Vec<usize>,
+    s_bwidth: usize,
+    s_height: u16,
 }
 
 impl App {
@@ -254,6 +256,8 @@ impl App {
             typing_res: String::new(),
             copy_buffer: Buffer::Empty,
             measure_indices: Vec::new(),
+            s_bwidth: 4,
+            s_height: 4,
         })
     }
 
@@ -313,9 +317,9 @@ impl App {
         }
     }
 
-    fn visible_beat_range(&self, max: u16) -> BeatRange {
+    fn visible_beat_range(&self) -> BeatRange {
         let num_beats = self.sel.beats(&self.song).len();
-        self.sel.scroll..(self.sel.scroll + max as usize).min(num_beats)
+        self.sel.scroll..(self.sel.scroll + self.s_bwidth).min(num_beats)
     }
 
     fn draw_durations(&self, win: &mut window::Window, range: BeatRange) -> Result<()> {
@@ -368,10 +372,10 @@ impl App {
         }
     }
 
-    fn draw(&self, win: &mut window::Window, (w, _h): (u16, u16)) -> Result<()> {
+    fn draw(&self, win: &mut window::Window) -> Result<()> {
         let track = self.sel.track(&self.song);
         win.moveto(0, 0)?;
-        let range = self.visible_beat_range((w - 1) / 4);
+        let range = self.visible_beat_range();
         self.draw_durations(win, range.clone())?;
         for i in 0..track.string_count {
             self.draw_string(win, i, range.clone())?;
@@ -658,6 +662,7 @@ impl App {
                 },
                 event::Event::Resize(..) => {
                     win.moveto(0, 0)?.clear()?;
+                    self.reset_sdim(crossterm::terminal::size().unwrap());
                     Ok(true)
                 }
                 _ => Ok(false),
@@ -667,6 +672,11 @@ impl App {
         }
     }
 
+    fn reset_sdim(&mut self, (w, h): (u16, u16)) {
+        self.s_bwidth = ((w - 1) / 4) as usize;
+        self.s_height = h;
+    }
+
     pub fn run(mut self) -> Result<()> {
         let args = Args::parse();
         self.song_path = args.path;
@@ -674,11 +684,12 @@ impl App {
 
         let mut win = window::Window::new()?;
         win.clear()?;
+        self.reset_sdim(crossterm::terminal::size().unwrap());
         let mut do_redraw = true;
         while !self.should_close {
             if do_redraw {
                 self.reset_measure_indices();
-                self.draw(&mut win, crossterm::terminal::size().unwrap())?;
+                self.draw(&mut win)?;
             }
             do_redraw = self.proc_event(&mut win)?;
         }
