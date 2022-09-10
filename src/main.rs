@@ -5,6 +5,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate serde_repr;
 mod app;
+mod cursor;
 mod dur;
 mod error;
 mod song;
