@@ -1,4 +1,5 @@
 use crate::{
+    buffer::Buffer,
     dur::Duration,
     song::{Beat, Note, Song, Track},
 };
@@ -119,5 +120,56 @@ impl Cursor {
     pub fn delete_beats(&self, song: &mut Song, count: usize) {
         self.beats_mut(song)
             .splice(self.beat..self.beat + count, []);
+    }
+
+    pub fn copy_note(&self, song: &mut Song, string: u16) -> Buffer {
+        if let Some(note) = self.beat_i(song, self.beat).get_note(string) {
+            Buffer::Note(note.clone())
+        } else {
+            Buffer::Empty
+        }
+    }
+
+    pub fn copy_beat(&self, song: &mut Song) -> Buffer {
+        Buffer::Beat(self.beat_i(song, self.beat).clone())
+    }
+
+    pub fn copy_beats(&self, song: &mut Song, count: usize) -> Buffer {
+        if let Some(beats) = self.beats(song).get(self.beat..self.beat + count) {
+            Buffer::MultiBeat(beats.to_owned())
+        } else {
+            Buffer::Empty
+        }
+    }
+
+    fn paste_note(&self, song: &mut Song, fret: u16) {
+        self.beat_mut(song).set_note(self.string, fret);
+    }
+
+    fn paste_beat(&self, song: &mut Song, in_place: bool, beat: Beat) {
+        if in_place {
+            self.beats_mut(song)[self.beat] = beat;
+        } else {
+            self.beats_mut(song).insert(self.beat, beat);
+        }
+    }
+
+    fn paste_multi_beat(&self, song: &mut Song, in_place: bool, src: Vec<Beat>) {
+        if in_place {
+            self.beats_mut(song).remove(self.beat);
+        }
+        let dest = self.beats_mut(song);
+        let after = dest.split_off(self.beat);
+        dest.extend(src);
+        dest.extend(after);
+    }
+
+    pub fn paste_once(&mut self, song: &mut Song, buf: &Buffer, in_place: bool) {
+        match buf {
+            Buffer::Empty => {}
+            Buffer::Note(n) => self.paste_note(song, n.fret),
+            Buffer::Beat(b) => self.paste_beat(song, in_place, b.clone()),
+            Buffer::MultiBeat(b) => self.paste_multi_beat(song, in_place, b.clone()),
+        }
     }
 }

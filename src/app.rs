@@ -4,7 +4,7 @@ use crate::{
     dur::Duration,
     error::{Error, Result},
     history::{Action, History},
-    song::{Beat, Song, Track},
+    song::{Song, Track},
     window,
 };
 use clap::Parser;
@@ -87,7 +87,7 @@ pub struct App {
     sel: Cursor,
     typing: Typing,
     typing_res: String,
-    copy_buffer: Buffer,
+    copy_buf: Buffer,
     s_bwidth: usize,
     s_height: u16,
     history: History,
@@ -103,7 +103,7 @@ impl App {
             sel: Cursor::new(),
             typing: Typing::None,
             typing_res: String::new(),
-            copy_buffer: Buffer::Empty,
+            copy_buf: Buffer::Empty,
             s_bwidth: 4,
             s_height: 4,
             history: History::new(32),
@@ -226,39 +226,6 @@ impl App {
         }
     }
 
-    // Paste functions
-
-    fn paste_note(&mut self, string: u16, fret: u16) {
-        self.sel.beat_mut(&mut self.song).set_note(string, fret);
-    }
-
-    fn paste_beat(&mut self, in_place: bool, index: usize, beat: Beat) {
-        if in_place {
-            self.sel.beats_mut(&mut self.song)[index] = beat;
-        } else {
-            self.sel.beats_mut(&mut self.song).insert(index, beat);
-        }
-    }
-
-    fn paste_multi_beat(&mut self, in_place: bool, index: usize, src: Vec<Beat>) {
-        if in_place {
-            self.sel.beats_mut(&mut self.song).remove(index);
-        }
-        let dest = self.sel.beats_mut(&mut self.song);
-        let after = dest.split_off(index);
-        dest.extend(src);
-        dest.extend(after);
-    }
-
-    fn paste_once(&mut self, in_place: bool) {
-        match &self.copy_buffer {
-            Buffer::Empty => {}
-            Buffer::Note(n) => self.paste_note(self.sel.string, n.fret),
-            Buffer::Beat(b) => self.paste_beat(in_place, self.sel.beat, b.clone()),
-            Buffer::MultiBeat(b) => self.paste_multi_beat(in_place, self.sel.beat, b.clone()),
-        }
-    }
-
     // Drawing util functions
 
     fn reset_sdim(&mut self, (w, h): (u16, u16)) {
@@ -273,9 +240,9 @@ impl App {
 
     fn gen_status_msg(&self) -> String {
         if self.typing.is_none() {
-            format!("{} | buffer : {:?}", self.typing_res, self.copy_buffer)
+            format!("{} | buffer : {:?}", self.typing_res, self.copy_buf)
         } else {
-            format!("{} $ buffer : {:?}", self.typing, self.copy_buffer)
+            format!("{} $ buffer : {:?}", self.typing, self.copy_buf)
         }
     }
 
@@ -356,28 +323,6 @@ impl App {
         Ok(())
     }
 
-    // Copy functions
-
-    fn copy_note(&self, index: usize, string: u16) -> Buffer {
-        if let Some(note) = self.sel.beat_i(&self.song, index).get_note(string) {
-            Buffer::Note(note.clone())
-        } else {
-            Buffer::Empty
-        }
-    }
-
-    fn copy_beat(&self, index: usize) -> Buffer {
-        Buffer::Beat(self.sel.beat_i(&self.song, index).clone())
-    }
-
-    fn copy_beats(&self, index: usize, count: usize) -> Buffer {
-        if let Some(beats) = self.sel.beats(&self.song).get(index..index + count) {
-            Buffer::MultiBeat(beats.to_owned())
-        } else {
-            Buffer::Empty
-        }
-    }
-
     // Command processors
 
     fn proc_t_command(&mut self, s_cmd: String) -> Result<String> {
@@ -453,21 +398,21 @@ impl App {
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => {
-                    self.copy_buffer = self.copy_note(self.sel.beat, self.sel.string);
-                    match &self.copy_buffer {
+                    self.copy_buf = self.sel.copy_note(&mut self.song, self.sel.string);
+                    match &self.copy_buf {
                         Buffer::Note(_) => Ok("Note copied".into()),
                         _ => Err(Error::InvalidOp("No note selected".into())),
                     }
                 }
                 (Ok(count), "b") => {
-                    self.copy_buffer = self.copy_beats(self.sel.beat, count);
-                    match &self.copy_buffer {
+                    self.copy_buf = self.sel.copy_beats(&mut self.song, count);
+                    match &self.copy_buf {
                         Buffer::MultiBeat(_) => Ok(format!("{count} beats copied")),
                         _ => Err(Error::InvalidOp("Copy range out of range".into())),
                     }
                 }
                 (_, "b") => {
-                    self.copy_buffer = self.copy_beat(self.sel.beat);
+                    self.copy_buf = self.sel.copy_beat(&mut self.song);
                     Ok("Beat copied".into())
                 }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
@@ -588,8 +533,8 @@ impl App {
                 KeyCode::Char('x') => self.typing = Typing::Delete(String::new()),
                 KeyCode::Char('l') => self.typing = Typing::Duration(String::new()),
                 KeyCode::Char('k') => self.typing = Typing::Clear(String::new()),
-                KeyCode::Char('v') => self.paste_once(false),
-                KeyCode::Char('V') => self.paste_once(true),
+                KeyCode::Char('v') => self.sel.paste_once(&mut self.song, &self.copy_buf, false),
+                KeyCode::Char('V') => self.sel.paste_once(&mut self.song, &self.copy_buf, true),
                 KeyCode::Char('z') => {
                     let res = self.undo();
                     self.set_typing_res(res);
