@@ -1,4 +1,5 @@
-use crate::error::Error;
+use crate::error::{Error, Result, SResult};
+use regex::Regex;
 use serde::{
     de::{self, Visitor},
     ser::SerializeTuple,
@@ -8,8 +9,14 @@ use std::fmt;
 
 type Fraction = fraction::GenericFraction<u8>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub struct Duration(Fraction);
+
+impl fmt::Debug for Duration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Duration").field(&self.tuple()).finish()
+    }
+}
 
 impl Duration {
     pub fn new(a: u8, b: u8) -> Self {
@@ -18,6 +25,10 @@ impl Duration {
 
     pub fn tuple(&self) -> (u8, u8) {
         (*self.0.numer().unwrap(), *self.0.denom().unwrap())
+    }
+
+    pub fn dotted(&self) -> Self {
+        Self::new(self.0.numer().unwrap() * 3, self.0.denom().unwrap() * 2)
     }
 
     pub fn dur_icon(&self) -> &'static str {
@@ -40,6 +51,36 @@ impl Duration {
             (1, 48) => "32⅓",
             (1, 96) => "64⅓",
             _ => " ? ",
+        }
+    }
+
+    pub fn parse(s: &str) -> Result<Self> {
+        lazy_static::lazy_static! {
+            static ref RE: Regex = Regex::new(r"^(?:(\d+)/|)(\d+)(\.|)(?::(\d+)|)$").unwrap();
+        }
+        let caps = RE.captures(s).unwrap();
+
+        let num: Option<u8> = caps.get(1).map(|s| s.as_str().parse().unwrap());
+        let base: Option<u8> = caps.get(2).map(|s| s.as_str().parse().unwrap());
+        let dotted = caps.get(3).unwrap().range().len() > 0;
+        let tuplet: Option<u8> = caps.get(4).map(|s| s.as_str().parse().unwrap());
+
+        if let Some(base) = base {
+            let mut d = Duration::new(1, base);
+            if dotted {
+                d = d.dotted();
+            }
+            if num.is_some() {
+                d = d * num.unwrap();
+            }
+            if tuplet.is_some() {
+                d = (d / tuplet.unwrap()) * 2;
+            }
+            Ok(d)
+        } else {
+            Err(Error::InvalidOp(format!(
+                "Unable to parse '{s}' as Duration"
+            )))
         }
     }
 }
@@ -85,33 +126,6 @@ impl<'de> Deserialize<'de> for Duration {
     }
 }
 
-impl std::str::FromStr for Duration {
-    type Err = Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "1" => Ok(Self::new(1, 1)),
-            "2" => Ok(Self::new(1, 2)),
-            "4" => Ok(Self::new(1, 4)),
-            "8" => Ok(Self::new(1, 8)),
-            "16" => Ok(Self::new(1, 16)),
-            "32" => Ok(Self::new(1, 32)),
-            _ => {
-                if let Some((a, b)) = s.split_once('*') {
-                    let (a, b) = (a.parse(), b.parse());
-                    if a.is_err() || b.is_err() {
-                        Err(Error::InvalidOp(format!("Cannot parse '{s}' as Duration")))
-                    } else {
-                        Ok(Self::new(a.unwrap(), b.unwrap()))
-                    }
-                } else {
-                    Err(Error::InvalidOp(format!("Cannot parse '{s}' as Duration")))
-                }
-            }
-        }
-    }
-}
-
 impl std::ops::Add for Duration {
     type Output = Self;
 
@@ -125,5 +139,21 @@ impl std::ops::Sub for Duration {
 
     fn sub(self, rhs: Self) -> Self::Output {
         Duration(self.0 - rhs.0)
+    }
+}
+
+impl std::ops::Mul<u8> for Duration {
+    type Output = Self;
+
+    fn mul(self, rhs: u8) -> Self::Output {
+        Duration(self.0 * Fraction::new(rhs, 1))
+    }
+}
+
+impl std::ops::Div<u8> for Duration {
+    type Output = Self;
+
+    fn div(self, rhs: u8) -> Self::Output {
+        Duration(self.0 * Fraction::new(1, rhs))
     }
 }

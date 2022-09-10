@@ -2,7 +2,7 @@ use crate::{
     buffer::Buffer,
     cursor::Cursor,
     dur::Duration,
-    error::{Error, Result},
+    error::{Error, Result, SResult},
     history::{Action, History},
     song::{Song, Track},
     window,
@@ -449,7 +449,7 @@ impl App {
     }
 
     fn proc_t_duration(&mut self, cmd: String) -> Result<String> {
-        let dur: Duration = cmd.parse()?;
+        let dur = Duration::parse(&cmd)?;
         self.push_action(Action::set_duration(
             self.sel.clone(),
             self.sel.beat(&self.song).dur,
