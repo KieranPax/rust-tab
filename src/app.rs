@@ -1,6 +1,7 @@
 use crate::{
     dur::Duration,
     error::{Error, Result},
+    song::{Beat, Note, Song, Track},
     window,
 };
 use clap::Parser;
@@ -8,7 +9,6 @@ use crossterm::{
     event::{self, KeyCode},
     style::Stylize,
 };
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
 #[derive(Parser, Debug)]
@@ -22,96 +22,6 @@ struct Args {
 }
 
 type BeatRange = std::ops::Range<usize>;
-
-#[derive(Clone, Serialize, Deserialize)]
-struct Note {
-    string: u16,
-    fret: u32,
-}
-
-impl Note {
-    fn new(string: u16, fret: u32) -> Self {
-        Self { string, fret }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-struct Beat {
-    dur: Duration,
-    notes: Vec<Note>,
-}
-
-impl Beat {
-    fn new(dur: Duration) -> Self {
-        Self {
-            dur,
-            notes: Vec::new(),
-        }
-    }
-
-    fn copy_duration(&self) -> Self {
-        Self::new(self.dur)
-    }
-
-    fn get_note(&self, string: u16) -> Option<&Note> {
-        for i in self.notes.iter() {
-            if i.string == string {
-                return Some(i);
-            }
-        }
-        None
-    }
-
-    fn set_note(&mut self, string: u16, fret: u32) {
-        for i in self.notes.iter_mut() {
-            if i.string == string {
-                i.fret = fret;
-                return;
-            }
-        }
-        self.notes.push(Note::new(string, fret))
-    }
-
-    fn del_note(&mut self, string: u16) {
-        for i in 0..self.notes.len() {
-            if self.notes[i].string == string {
-                self.notes.swap_remove(i);
-                return;
-            }
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct Track {
-    string_count: u16,
-    beats: Vec<Beat>,
-}
-
-impl Track {
-    fn new() -> Self {
-        Self {
-            string_count: 6,
-            beats: vec![Beat::new(Duration::new(1, 1))],
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct Song {
-    tracks: Vec<Track>,
-    #[serde(skip)]
-    measure_i: Vec<usize>,
-}
-
-impl Song {
-    fn new() -> Self {
-        Self {
-            tracks: vec![Track::new()],
-            measure_i: Vec::new(),
-        }
-    }
-}
 
 #[derive(Clone)]
 enum Typing {
