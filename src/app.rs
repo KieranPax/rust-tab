@@ -245,7 +245,7 @@ impl App {
 
     // Paste functions
 
-    fn paste_note(&mut self, string: u16, fret: u32) {
+    fn paste_note(&mut self, string: u16, fret: u16) {
         self.sel.beat_mut(&mut self.song).set_note(string, fret);
     }
 
@@ -426,7 +426,7 @@ impl App {
 
     // Set functions
 
-    fn set_note(&mut self, index: usize, string: u16, fret: u32) {
+    fn set_note(&mut self, index: usize, string: u16, fret: u16) {
         self.sel.beat_i_mut(&mut self.song, index).set_note(string, fret);
     }
 
@@ -461,7 +461,7 @@ impl App {
             },
             "n" => match cmd.get(1) {
                 Some(s) => {
-                    if let Ok(fret) = s.parse::<u32>() {
+                    if let Ok(fret) = s.parse::<u16>() {
                         let string = self.sel.string;
                         self.sel.beat_mut(&mut self.song).set_note(string, fret);
                         Ok(format!(

@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Note {
     pub string: u16,
-    pub fret: u32,
+    pub fret: u16,
 }
 
 impl Note {
-    pub fn new(string: u16, fret: u32) -> Self {
+    pub fn new(string: u16, fret: u16) -> Self {
         Self { string, fret }
     }
 }
@@ -40,7 +40,7 @@ impl Beat {
         None
     }
 
-    pub fn set_note(&mut self, string: u16, fret: u32) {
+    pub fn set_note(&mut self, string: u16, fret: u16) {
         for i in self.notes.iter_mut() {
             if i.string == string {
                 i.fret = fret;

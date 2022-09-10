@@ -9,8 +9,8 @@ pub enum Action {
     },
     SetNote {
         cur: Cursor,
-        old: Option<u32>,
-        new: Option<u32>,
+        old: Option<u16>,
+        new: Option<u16>,
     },
     ClearBeat {
         cur: Cursor,
@@ -23,7 +23,7 @@ impl Action {
         Self::SetDuration { cur, old, new }
     }
 
-    pub fn set_note(cur: Cursor, old: Option<u32>, new: Option<u32>) -> Self {
+    pub fn set_note(cur: Cursor, old: Option<u16>, new: Option<u16>) -> Self {
         Self::SetNote { cur, old, new }
     }
 
