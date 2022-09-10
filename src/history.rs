@@ -1,19 +1,29 @@
 use crate::{cursor::Cursor, dur::Duration};
 use std::collections::VecDeque;
 
-pub struct ActionData<T> {
+pub struct ActionData<T0, T1> {
     pub cursor: Cursor,
-    pub old: T,
-    pub new: T,
+    pub old: T0,
+    pub new: T1,
 }
 
 pub enum Action {
-    SetDuration(ActionData<Duration>),
+    SetDuration(ActionData<Duration, Duration>),
+    SetNote(ActionData<Option<u32>, u32>),
+    DelNote(ActionData<u32, ()>),
 }
 
 impl Action {
     pub fn set_duration(cursor: Cursor, old: Duration, new: Duration) -> Self {
         Self::SetDuration(ActionData { cursor, old, new })
+    }
+
+    pub fn set_note(cursor: Cursor, old: Option<u32>, new: u32) -> Self {
+        Self::SetNote(ActionData { cursor, old, new })
+    }
+
+    pub fn del_note(cursor: Cursor, old: u32) -> Self {
+        Self::DelNote(ActionData { cursor, old, new: () })
     }
 }
 
