@@ -1,4 +1,4 @@
-use crate::{cursor::Cursor, dur::Duration};
+use crate::{cursor::Cursor, dur::Duration, song::Note};
 use std::collections::VecDeque;
 
 pub enum Action {
@@ -12,6 +12,10 @@ pub enum Action {
         old: Option<u32>,
         new: Option<u32>,
     },
+    ClearBeat {
+        cur: Cursor,
+        old: Vec<Note>,
+    }
 }
 
 impl Action {
@@ -21,6 +25,10 @@ impl Action {
 
     pub fn set_note(cur: Cursor, old: Option<u32>, new: Option<u32>) -> Self {
         Self::SetNote { cur, old, new }
+    }
+
+    pub fn clear_beat(cur: Cursor, old: Vec<Note>) -> Self{
+        Self::ClearBeat { cur, old }
     }
 }
 

@@ -149,16 +149,20 @@ impl App {
         match &*action {
             Action::SetDuration { cur, new, .. } => {
                 self.set_duration(cur.beat, *new);
-                Ok(format!("{new:?}"))
+                Ok("Set duration".into())
             }
             Action::SetNote { cur, new, .. } => {
                 if let Some(fret) = *new {
                     cur.beat_mut(&mut self.song).set_note(cur.string, fret);
-                    Ok(format!("Set note ({fret})"))
+                    Ok("Set note".into())
                 } else {
                     self.clear_note(cur.beat, cur.string);
-                    Ok(format!("Delete note"))
+                    Ok("Delete note".into())
                 }
+            }
+            Action::ClearBeat { cur, .. } => {
+                cur.beat_mut(&mut self.song).notes = Vec::new();
+                Ok("Clear beat".into())
             }
         }
     }
@@ -167,7 +171,7 @@ impl App {
         match &*action {
             Action::SetDuration { cur, old, .. } => {
                 self.set_duration(cur.beat, *old);
-                Ok(format!("Undo set duration"))
+                Ok("Undo set duration".into())
             }
             Action::SetNote { cur, old, new } => {
                 if let Some(fret) = *old {
@@ -176,10 +180,14 @@ impl App {
                     self.clear_note(cur.beat, cur.string);
                 }
                 if new.is_none() {
-                    Ok(format!("Undo delete note"))
+                    Ok("Undo delete note".into())
                 } else {
-                    Ok(format!("Undo set note"))
+                    Ok("Undo set note".into())
                 }
+            }
+            Action::ClearBeat { cur, old } => {
+                cur.beat_mut(&mut self.song).notes = old.clone();
+                Ok("Undo clear beat".into())
             }
         }
     }
@@ -563,18 +571,26 @@ impl App {
             let (a, b) = cmd.split_at(cmd.len() - 1);
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
-                (_, "n") => {
-                    self.clear_note(self.sel.beat, self.sel.string);
-                    Ok("Note cleared".into())
-                }
+                (_, "n") => self.push_action(Action::set_note(
+                    self.sel.clone(),
+                    self.sel
+                        .beat(&self.song)
+                        .get_note(self.sel.string)
+                        .map(|n| n.fret),
+                    None,
+                )),
                 (Ok(count), "b") => {
                     self.clear_beats(self.sel.beat, count);
                     Ok("{count} beats cleared".into())
                 }
-                (_, "b") => {
-                    self.clear_beat(self.sel.beat);
-                    Ok("Beat cleared".into())
-                }
+                (_, "b") => self.push_action(Action::clear_beat(
+                    self.sel.clone(),
+                    self.sel.beat(&self.song).notes.clone(),
+                )),
+                // {
+                //     self.clear_beat(self.sel.beat);
+                //     Ok("Beat cleared".into())
+                // }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
             }
         }
