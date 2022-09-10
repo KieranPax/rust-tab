@@ -1,5 +1,6 @@
 use crate::song::{Beat, Song, Track};
 
+#[derive(Clone)]
 pub struct Cursor {
     pub scroll: usize,
     pub track: usize,

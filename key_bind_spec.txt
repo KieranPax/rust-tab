@@ -38,7 +38,7 @@ v                       => Insert contents of buffer at cursor
 --          (overwrite beat/measure) (only valid for cb/cm)
 
 z                       => Undo (todo)
-y                       => Redo (todo)
+Z                       => Redo (todo)
 
 kn                      => Delete note at cursor
 kb                      => Clear notes from beat at cursor

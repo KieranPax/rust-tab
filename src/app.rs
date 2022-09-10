@@ -2,6 +2,7 @@ use crate::{
     cursor::Cursor,
     dur::Duration,
     error::{Error, Result},
+    history,
     song::{Beat, Note, Song, Track},
     window,
 };
@@ -106,6 +107,7 @@ pub struct App {
     copy_buffer: Buffer,
     s_bwidth: usize,
     s_height: u16,
+    history: history::History,
 }
 
 impl App {
@@ -121,7 +123,53 @@ impl App {
             copy_buffer: Buffer::Empty,
             s_bwidth: 4,
             s_height: 4,
+            history: history::History::new(32),
         })
+    }
+
+    // History functions
+
+    fn undo(&mut self) -> Result<String> {
+        if let Some(action) = self.history.undo() {
+            self.undo_action(action)
+        } else {
+            Err(Error::InvalidOp("Cannot undo any further".into()))
+        }
+    }
+
+    fn redo(&mut self) -> Result<String> {
+        if let Some(action) = self.history.redo() {
+            self.apply_action(action)
+        } else {
+            Err(Error::InvalidOp("Cannot redo any further".into()))
+        }
+    }
+
+    fn apply_action(&mut self, action: std::rc::Rc<history::Action>) -> Result<String> {
+        match &*action {
+            history::Action::SetDuration(history::ActionData { cursor, new, .. }) => {
+                cursor.beat_mut(&mut self.song).dur = *new;
+                Ok(format!("{new:?}"))
+            },
+        }
+    }
+
+    fn undo_action(&mut self, action: std::rc::Rc<history::Action>) -> Result<String> {
+        match &*action {
+            history::Action::SetDuration(history::ActionData { cursor, old, .. }) => {
+                cursor.beat_mut(&mut self.song).dur = *old;
+                Ok(format!("Undo {old:?}"))
+            },
+        }
+    }
+
+    fn push_action(&mut self, action: history::Action) -> Result<String> {
+        let action = std::rc::Rc::new(action);
+        let res = self.apply_action(action.clone());
+        if res.is_ok() {
+            self.history.push(action);
+        }
+        res
     }
 
     // IO functions
@@ -216,6 +264,19 @@ impl App {
             format!("{} | buffer : {:?}", self.typing_res, self.copy_buffer)
         } else {
             format!("{} $ buffer : {:?}", self.typing, self.copy_buffer)
+        }
+    }
+
+    fn set_typing_res<T>(&mut self, res: Result<T>)
+    where
+        T: Into<String>,
+    {
+        if let Err(e) = res {
+            self.typing = Typing::None;
+            self.typing_res = format!("{e}");
+        } else {
+            self.typing = Typing::None;
+            self.typing_res = res.unwrap().into();
         }
     }
 
@@ -458,8 +519,11 @@ impl App {
 
     fn proc_t_duration(&mut self, cmd: String) -> Result<String> {
         let dur: Duration = cmd.parse()?;
-        self.set_duration(self.sel.beat, dur);
-        Ok(format!("{dur:?}"))
+        self.push_action(history::Action::set_duration(
+            self.sel.clone(),
+            self.sel.beat(&self.song).dur,
+            dur,
+        ))
     }
 
     fn proc_t_clear(&mut self, cmd: String) -> Result<String> {
@@ -488,7 +552,7 @@ impl App {
 
     // Raw event processors
 
-    fn process_typing(&mut self) -> Result<()> {
+    fn process_typing(&mut self) {
         let res = match self.typing.clone() {
             Typing::Command(s) => self.proc_t_command(s),
             Typing::Note(s) => self.proc_t_note_edit(s),
@@ -498,15 +562,7 @@ impl App {
             Typing::Clear(s) => self.proc_t_clear(s),
             Typing::None => panic!("App.typing hasn't been initiated"),
         };
-        if let Err(e) = res {
-            self.typing = Typing::None;
-            self.typing_res = format!("{e}");
-            Ok(())
-        } else {
-            self.typing = Typing::None;
-            self.typing_res = res.unwrap();
-            Ok(())
-        }
+        self.set_typing_res(res);
     }
 
     fn key_press(&mut self, key: KeyCode) {
@@ -515,10 +571,10 @@ impl App {
                 KeyCode::Char(c) => {
                     typing.push(c);
                     if self.typing.is_number_char() && !c.is_digit(10) {
-                        self.process_typing().unwrap()
+                        self.process_typing()
                     }
                 }
-                KeyCode::Enter => self.process_typing().unwrap(),
+                KeyCode::Enter => self.process_typing(),
                 KeyCode::Backspace => {
                     typing.pop();
                 }
@@ -544,6 +600,14 @@ impl App {
                 KeyCode::Char('k') => self.typing = Typing::Clear(String::new()),
                 KeyCode::Char('v') => self.paste_once(false),
                 KeyCode::Char('V') => self.paste_once(true),
+                KeyCode::Char('z') => {
+                    let res = self.undo();
+                    self.set_typing_res(res);
+                }
+                KeyCode::Char('Z') => {
+                    let res = self.redo();
+                    self.set_typing_res(res);
+                }
                 KeyCode::Char(':') => self.typing = Typing::Command(String::new()),
                 KeyCode::Char('i') => {
                     let beat = self.sel.beat(&self.song).copy_duration();

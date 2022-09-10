@@ -8,6 +8,7 @@ mod app;
 mod cursor;
 mod dur;
 mod error;
+mod history;
 mod song;
 mod window;
 
