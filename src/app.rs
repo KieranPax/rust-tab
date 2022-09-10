@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 #[derive(Parser, Debug)]
-#[clap(name = "tab")]
+#[clap(name = "rust-tab")]
 #[clap(version, about, long_about = None)]
 struct Args {
     #[clap(value_parser)]

@@ -65,12 +65,23 @@ impl<'de> Deserialize<'de> for Duration {
 impl fmt::Display for Duration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.tuple() {
-            (1, 1) => f.write_str("   "),
-            (1, 2) => f.write_str(" - "),
-            (1, 4) => f.write_str(" 1 "),
-            (1, 8) => f.write_str(" 2 "),
-            (1, 16) => f.write_str(" 4 "),
-            (1, 32) => f.write_str(" 8 "),
+            (1, 1) => f.write_str(" 1 "),
+            (1, 2) => f.write_str(" 2 "),
+            (1, 4) => f.write_str(" 4 "),
+            (1, 8) => f.write_str(" 8 "),
+            (1, 16) => f.write_str("16 "),
+            (1, 32) => f.write_str("32 "),
+            (3, 2) => f.write_str(" 1•"),
+            (3, 4) => f.write_str(" 2•"),
+            (3, 8) => f.write_str(" 4•"),
+            (3, 16) => f.write_str(" 8•"),
+            (3, 32) => f.write_str("16•"),
+            (1, 3) => f.write_str(" 2⅓"),
+            (1, 6) => f.write_str(" 4⅓"),
+            (1, 12) => f.write_str(" 8⅓"),
+            (1, 24) => f.write_str("16⅓"),
+            (1, 48) => f.write_str("32⅓"),
+            (1, 96) => f.write_str("64⅓"),
             _ => f.write_str(" ? "),
         }
     }
@@ -87,7 +98,18 @@ impl std::str::FromStr for Duration {
             "8" => Ok(Self::new(1, 8)),
             "16" => Ok(Self::new(1, 16)),
             "32" => Ok(Self::new(1, 32)),
-            _ => Err(Error::InvalidOp(format!("Cannot parse '{s}' as Duration"))),
+            _ => {
+                if let Some((a, b)) = s.split_once('/') {
+                    let (a, b) = (a.parse(), b.parse());
+                    if a.is_err() || b.is_err() {
+                        Err(Error::InvalidOp(format!("Cannot parse '{s}' as Duration")))
+                    } else {
+                        Ok(Self::new(a.unwrap(), b.unwrap()))
+                    }
+                } else {
+                    Err(Error::InvalidOp(format!("Cannot parse '{s}' as Duration")))
+                }
+            }
         }
     }
 }
