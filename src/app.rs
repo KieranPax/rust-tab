@@ -14,6 +14,8 @@ use std::fmt;
 struct Args {
     #[clap(value_parser)]
     path: Option<String>,
+    #[clap(short, long, action)]
+    draw_timer: bool,
 }
 
 type BeatRange = std::ops::Range<usize>;
@@ -251,6 +253,7 @@ impl Selected {
 }
 
 pub struct App {
+    args: Args,
     should_close: bool,
     song_path: Option<String>,
     song: Song,
@@ -266,6 +269,7 @@ pub struct App {
 impl App {
     pub fn new() -> Result<Self> {
         Ok(Self {
+            args: Args::parse(),
             should_close: false,
             song_path: None,
             song: Song::new(),
@@ -435,6 +439,7 @@ impl App {
     }
 
     fn draw(&self, win: &mut window::Window) -> Result<()> {
+        let t0 = std::time::Instant::now();
         let track = self.sel.track(&self.song);
         win.moveto(0, 0)?;
         let range = self.visible_beat_range();
@@ -444,8 +449,12 @@ impl App {
         }
         win.moveto(0, track.string_count + 2)?
             .clear_line()?
-            .print(self.gen_status_msg())?
-            .update()?;
+            .print(self.gen_status_msg())?;
+        let dur = std::time::Instant::now().duration_since(t0).as_secs_f32() * 1000.0;
+        if self.args.draw_timer {
+            win.print(format!("     -> ({dur:.2}ms)"))?;
+        }
+        win.update()?;
         Ok(())
     }
 
@@ -714,8 +723,7 @@ impl App {
     // Main loop
 
     pub fn run(mut self) -> Result<()> {
-        let args = Args::parse();
-        self.song_path = args.path;
+        self.song_path = self.args.path.clone();
         let _ = self.try_load_file(None);
 
         let mut win = window::Window::new()?;
