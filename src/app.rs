@@ -151,6 +151,10 @@ impl App {
                 cur.delete_beat(&mut self.song);
                 Ok("Delete beat".into())
             }
+            Action::DeleteBeats { cur, old } => {
+                cur.delete_beats(&mut self.song, old.len());
+                Ok("Undo delete beat".into())
+            }
         }
     }
 
@@ -178,6 +182,10 @@ impl App {
             }
             Action::DeleteBeat { cur, old } => {
                 cur.paste_beat(&mut self.song, false, old.clone());
+                Ok("Undo delete beat".into())
+            }
+            Action::DeleteBeats { cur, old } => {
+                cur.paste_multi_beat(&mut self.song, false, old.clone());
                 Ok("Undo delete beat".into())
             }
         }
@@ -444,8 +452,11 @@ impl App {
                     None,
                 )),
                 (Ok(count), "b") => {
-                    self.sel.delete_beats(&mut self.song, count);
-                    Ok(format!("{count} beats deleted"))
+                    if let Some(b) = self.sel.beats(&self.song).get(self.sel.beat..count) {
+                        self.push_action(Action::delete_beats(self.sel.clone(), b.to_owned()))
+                    } else {
+                        Err(Error::InvalidOp("Tried to delete out of bounds".into()))
+                    }
                 }
                 (_, "b") => self.push_action(Action::delete_beat(
                     self.sel.clone(),

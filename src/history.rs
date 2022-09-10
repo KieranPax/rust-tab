@@ -24,6 +24,10 @@ pub enum Action {
         cur: Cursor,
         old: Beat,
     },
+    DeleteBeats {
+        cur: Cursor,
+        old: Vec<Beat>,
+    },
 }
 
 impl Action {
@@ -41,6 +45,10 @@ impl Action {
 
     pub fn delete_beat(cur: Cursor, old: Beat) -> Self {
         Self::DeleteBeat { cur, old }
+    }
+
+    pub fn delete_beats(cur: Cursor, old: Vec<Beat>) -> Self {
+        Self::DeleteBeats { cur, old }
     }
 }
 
