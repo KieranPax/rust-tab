@@ -13,6 +13,7 @@ impl Window {
         let mut o = Self {
             stdout: std::io::stdout(),
         };
+        map_io_err!(crossterm::terminal::enable_raw_mode())?;
         o.queue(crossterm::cursor::Hide)?
             .queue(crossterm::terminal::SetTitle("Tab"))?
             .update()?;
