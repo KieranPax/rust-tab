@@ -384,10 +384,7 @@ impl App {
 
     fn gen_status_msg(&self) -> String {
         if self.typing.is_none() {
-            format!(
-                "{} | buffer : {:?}    {} {}",
-                self.typing_res, self.copy_buffer, self.sel.beat, self.sel.scroll
-            )
+            format!("{} | buffer : {:?}", self.typing_res, self.copy_buffer)
         } else {
             format!("{} $ buffer : {:?}", self.typing, self.copy_buffer)
         }
