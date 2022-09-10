@@ -1,0 +1,66 @@
+-- Everything is case sensitive (use shift where there are capitals)
+-- Esc will cancel the current key combo
+-- {n}/{a}/{b} are integers
+-- {dur}/{v} are custom matches
+
+(Esc)                   => Quit
+
+d                       => Move cursor forward 1 beat
+a                       => Move cursor back 1 beat
+w                       => Move cursor up
+s                       => Move cursor down
+(Right)                 => Scroll screen forward
+(Left)                  => Scroll screen back
+D                       => Move cursor forward 1 measure
+A                       => Move cursor back 1 measure
+(Home)                  => Move cursor back 1 section
+(End)                   => Move cursor forward 1 section
+
+-- {v} :
+    {n} = note at fret n
+    x = dead note (todo)
+
+n{v}[Enter|wasd|n]      => Write note at cursor
+{n}n{v}[Enter|wasd]     => Write the same note in n beats from cursor
+--  (Enter) will confirm the note
+--  (wasd) will confirm the note; move the cursor
+--  (n) will confirm the note; move the cursor forward; start editting next note
+--  ie n0n1n2d will result in :  - 0 - 1 - 2 -[ ]-
+
+cn                      => Copy note at cursor
+cb                      => Copy beat at cursor
+{n}cb                   => Copy n beats from cursor
+cm                      => Copy beats of measure at cursor
+{n}cm                   => Copy beats of n measures from cursor
+cl                      => Copy duration of beat at cursor
+
+v                       => Insert contents of buffer at cursor
+V                       => Place contents of buffer at cursor 
+--          (overwrite beat/measure) (only valid for cb/cm)
+
+z                       => Undo (todo)
+y                       => Redo (todo)
+
+kn                      => Delete note at cursor (d n)
+kb                      => Clear notes from beat at cursor
+{n}kb                   => Clear notes from n beats from cursor
+km                      => Clear notes of measure at cursor (todo)
+{n}km                   => Clear notes of n measures from cursor (todo)
+kM                      => Clear beats of measure at cursor (todo)
+{n}kM                   => Clear beats of n measures from cursor (todo)
+
+xn                      => Delete note at cursor (k n)
+xb                      => Delete beat at cursor
+{n}xb                   => Delete n beats from cursor
+xm                      => Delete measure at cursor (todo)
+{n}xm                   => Delete n measures from cursor (todo)
+
+-- {dur} :
+    {n} = 1/{n}
+    {n}. = 1.5/{n}
+    {a}/{b} = {a}/{b}
+    {dur}:{n} = {dur}/{n}
+
+l{dur}(Enter)           => Set duration of beat at cursor
+{n}l{dur}(Enter)        => Set duration of n beats from cursor
+L{dur}(Enter)           => Set duration of beats in measure at cursor
