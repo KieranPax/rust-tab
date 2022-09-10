@@ -45,7 +45,7 @@ impl Duration {
 }
 
 impl Serialize for Duration {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> SResult<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -65,7 +65,7 @@ impl<'de> Visitor<'de> for DurationVisitor {
         formatter.write_str("two integers between 0 and 255")
     }
 
-    fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
+    fn visit_seq<A>(self, mut seq: A) -> SResult<Self::Value, A::Error>
     where
         A: de::SeqAccess<'de>,
     {
@@ -76,7 +76,7 @@ impl<'de> Visitor<'de> for DurationVisitor {
 }
 
 impl<'de> Deserialize<'de> for Duration {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> SResult<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {

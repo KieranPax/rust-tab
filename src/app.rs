@@ -395,7 +395,7 @@ impl App {
             Ok(String::new())
         } else {
             let (a, b) = cmd.split_at(cmd.len() - 1);
-            let a: std::result::Result<usize, _> = a.parse();
+            let a: SResult<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => {
                     self.copy_buf = self.sel.copy_note(&mut self.song, self.sel.string);
@@ -425,7 +425,7 @@ impl App {
             Ok(String::new())
         } else {
             let (a, b) = cmd.split_at(cmd.len() - 1);
-            let a: std::result::Result<usize, _> = a.parse();
+            let a: SResult<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => self.push_action(Action::set_note(
                     self.sel.clone(),
@@ -462,7 +462,7 @@ impl App {
             Ok(String::new())
         } else {
             let (a, b) = cmd.split_at(cmd.len() - 1);
-            let a: std::result::Result<usize, _> = a.parse();
+            let a: SResult<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => self.push_action(Action::set_note(
                     self.sel.clone(),

@@ -18,6 +18,7 @@ impl std::fmt::Display for Error {
         }
     }
 }
+pub type SResult<T,E> = std::result::Result<T, E>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 mod error {
