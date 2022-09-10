@@ -216,6 +216,20 @@ impl Selected {
     fn beat_mut<'a>(&self, song: &'a mut Song) -> &'a mut Beat {
         &mut song.tracks[self.track].beats[self.beat]
     }
+
+    fn seek_string(&mut self, song: &Song, dire: i16) {
+        let new = self.string as i16 + dire;
+        self.string = new.clamp(0, self.track(song).string_count as i16 - 1) as u16;
+    }
+
+    fn seek_beat(&mut self, song: &mut Song, dire: isize) {
+        let new = (self.beat as isize + dire).max(0) as usize;
+        let beats = self.beats_mut(song);
+        while new >= beats.len() as usize {
+            beats.push(beats.last().unwrap().copy_duration());
+        }
+        self.beat = new;
+    }
 }
 
 pub struct App {
@@ -367,20 +381,6 @@ impl App {
             .print(self.gen_status_msg())?
             .update()?;
         Ok(())
-    }
-
-    fn seek_string(&mut self, dire: i16) {
-        let new = self.sel.string as i16 + dire;
-        self.sel.string = new.clamp(0, self.sel.track(&self.song).string_count as i16 - 1) as u16;
-    }
-
-    fn seek_beat(&mut self, dire: isize) {
-        let new = (self.sel.beat as isize + dire).max(0) as usize;
-        let beats = self.sel.beats_mut(&mut self.song);
-        while new >= beats.len() as usize {
-            beats.push(beats.last().unwrap().copy_duration());
-        }
-        self.sel.beat = new;
     }
 
     fn proc_t_command(&mut self, s_cmd: String) -> Result<String> {
@@ -614,10 +614,10 @@ impl App {
         } else {
             match key {
                 event::KeyCode::Char('q') | event::KeyCode::Esc => self.should_close = true,
-                event::KeyCode::Char('a') => self.seek_beat(-1),
-                event::KeyCode::Char('d') => self.seek_beat(1),
-                event::KeyCode::Char('w') => self.seek_string(-1),
-                event::KeyCode::Char('s') => self.seek_string(1),
+                event::KeyCode::Char('a') => self.sel.seek_beat(&mut self.song, -1),
+                event::KeyCode::Char('d') => self.sel.seek_beat(&mut self.song, 1),
+                event::KeyCode::Char('w') => self.sel.seek_string(&self.song, -1),
+                event::KeyCode::Char('s') => self.sel.seek_string(&self.song, 1),
                 event::KeyCode::Char('n') => self.typing = Typing::Note(String::new()),
                 event::KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
                 event::KeyCode::Char('x') => self.typing = Typing::Delete(String::new()),
