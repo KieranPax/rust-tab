@@ -181,11 +181,11 @@ impl App {
                 Ok("Undo clear beat".into())
             }
             Action::DeleteBeat { cur, old } => {
-                cur.paste_beat(&mut self.song, false, old.clone());
+                cur.insert_beat(&mut self.song, false, old.clone());
                 Ok("Undo delete beat".into())
             }
             Action::DeleteBeats { cur, old } => {
-                cur.paste_multi_beat(&mut self.song, false, old.clone());
+                cur.insert_beats(&mut self.song, false, old.clone());
                 Ok("Undo delete beat".into())
             }
         }
@@ -423,7 +423,7 @@ impl App {
                 (Ok(count), "b") => {
                     self.copy_buf = self.sel.copy_beats(&mut self.song, count);
                     match &self.copy_buf {
-                        Buffer::MultiBeat(_) => Ok(format!("{count} beats copied")),
+                        Buffer::Beats(_) => Ok(format!("{count} beats copied")),
                         _ => Err(Error::InvalidOp("Copy range out of range".into())),
                     }
                 }
@@ -452,7 +452,7 @@ impl App {
                     None,
                 )),
                 (Ok(count), "b") => {
-                    if let Some(b) = self.sel.beats(&self.song).get(self.sel.beat..count) {
+                    if let Some(b) = self.sel.beats_slice(&self.song, count) {
                         self.push_action(Action::delete_beats(self.sel.clone(), b.to_owned()))
                     } else {
                         Err(Error::InvalidOp("Tried to delete out of bounds".into()))

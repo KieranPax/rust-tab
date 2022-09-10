@@ -38,6 +38,12 @@ impl Cursor {
         &mut song.tracks[self.track].beats
     }
 
+    pub fn beats_slice<'a>(&self, song: &'a Song, count: usize) -> Option<&'a [Beat]> {
+        song.tracks[self.track]
+            .beats
+            .get(self.beat..self.beat + count)
+    }
+
     pub fn beat<'a>(&self, song: &'a Song) -> &'a Beat {
         &song.tracks[self.track].beats[self.beat]
     }
@@ -130,18 +136,18 @@ impl Cursor {
     }
 
     pub fn copy_beats(&self, song: &mut Song, count: usize) -> Buffer {
-        if let Some(beats) = self.beats(song).get(self.beat..self.beat + count) {
-            Buffer::MultiBeat(beats.to_owned())
+        if let Some(beats) = self.beats_slice(song, count) {
+            Buffer::Beats(beats.to_owned())
         } else {
             Buffer::Empty
         }
     }
 
-    pub fn paste_note(&self, song: &mut Song, fret: u16) {
+    pub fn insert_note(&self, song: &mut Song, fret: u16) {
         self.beat_mut(song).set_note(self.string, fret);
     }
 
-    pub fn paste_beat(&self, song: &mut Song, in_place: bool, beat: Beat) {
+    pub fn insert_beat(&self, song: &mut Song, in_place: bool, beat: Beat) {
         if in_place {
             self.beats_mut(song)[self.beat] = beat;
         } else {
@@ -150,7 +156,7 @@ impl Cursor {
         self.track_mut(song).update_measures();
     }
 
-    pub fn paste_multi_beat(&self, song: &mut Song, in_place: bool, src: Vec<Beat>) {
+    pub fn insert_beats(&self, song: &mut Song, in_place: bool, src: Vec<Beat>) {
         if in_place {
             self.beats_mut(song).remove(self.beat);
         }
@@ -164,9 +170,9 @@ impl Cursor {
     pub fn paste_once(&self, song: &mut Song, buf: &Buffer, in_place: bool) {
         match buf {
             Buffer::Empty => {}
-            Buffer::Note(n) => self.paste_note(song, n.fret),
-            Buffer::Beat(b) => self.paste_beat(song, in_place, b.clone()),
-            Buffer::MultiBeat(b) => self.paste_multi_beat(song, in_place, b.clone()),
+            Buffer::Note(n) => self.insert_note(song, n.fret),
+            Buffer::Beat(b) => self.insert_beat(song, in_place, b.clone()),
+            Buffer::Beats(b) => self.insert_beats(song, in_place, b.clone()),
         }
     }
 }
