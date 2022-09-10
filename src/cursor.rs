@@ -1,13 +1,13 @@
 use crate::song::{Beat, Song, Track};
 
-pub struct Selected {
+pub struct Cursor {
     pub scroll: usize,
     pub track: usize,
     pub beat: usize,
     pub string: u16,
 }
 
-impl Selected {
+impl Cursor {
     pub fn new() -> Self {
         Self {
             scroll: 0,
