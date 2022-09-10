@@ -677,7 +677,7 @@ impl App {
         };
         if let Err(e) = res {
             self.typing = Typing::None;
-            self.typing_res = format!("{e:?}");
+            self.typing_res = format!("{e}");
             Ok(())
         } else {
             self.typing = Typing::None;
