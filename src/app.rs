@@ -230,6 +230,24 @@ impl Selected {
         }
         self.beat = new;
     }
+
+    fn seek_scroll(&mut self, song: &Song, dire: isize) {
+        let new = (self.scroll as isize + dire).max(0) as usize;
+        self.scroll = new.min(self.beats(song).len() - 1);
+    }
+
+    fn cursor_to_scroll(&mut self, s_bwidth: usize) {
+        self.beat = self.beat.clamp(self.scroll, self.scroll + s_bwidth - 1);
+    }
+
+    fn scroll_to_cursor(&mut self, s_bwidth: usize) {
+        if self.scroll > self.beat {
+            self.scroll = self.beat;
+        }
+        if self.scroll + s_bwidth - 1 < self.beat {
+            self.scroll = self.beat - (s_bwidth - 1);
+        }
+    }
 }
 
 pub struct App {
@@ -366,7 +384,10 @@ impl App {
 
     fn gen_status_msg(&self) -> String {
         if self.typing.is_none() {
-            format!("{} | buffer : {:?}", self.typing_res, self.copy_buffer)
+            format!(
+                "{} | buffer : {:?}    {} {}",
+                self.typing_res, self.copy_buffer, self.sel.beat, self.sel.scroll
+            )
         } else {
             format!("{} $ buffer : {:?}", self.typing, self.copy_buffer)
         }
@@ -618,8 +639,14 @@ impl App {
         } else {
             match key {
                 event::KeyCode::Char('q') | event::KeyCode::Esc => self.should_close = true,
-                event::KeyCode::Char('a') => self.sel.seek_beat(&mut self.song, -1),
-                event::KeyCode::Char('d') => self.sel.seek_beat(&mut self.song, 1),
+                event::KeyCode::Char('a') => {
+                    self.sel.seek_beat(&mut self.song, -1);
+                    self.sel.scroll_to_cursor(self.s_bwidth)
+                }
+                event::KeyCode::Char('d') => {
+                    self.sel.seek_beat(&mut self.song, 1);
+                    self.sel.scroll_to_cursor(self.s_bwidth)
+                }
                 event::KeyCode::Char('w') => self.sel.seek_string(&self.song, -1),
                 event::KeyCode::Char('s') => self.sel.seek_string(&self.song, 1),
                 event::KeyCode::Char('n') => self.typing = Typing::Note(String::new()),
@@ -637,14 +664,12 @@ impl App {
                         .insert(self.sel.beat, beat);
                 }
                 event::KeyCode::Left => {
-                    if let Some(v) = self.sel.scroll.checked_sub(1) {
-                        self.sel.scroll = v
-                    }
+                    self.sel.seek_scroll(&self.song, -1);
+                    self.sel.cursor_to_scroll(self.s_bwidth)
                 }
                 event::KeyCode::Right => {
-                    if let Some(v) = self.sel.scroll.checked_add(1) {
-                        self.sel.scroll = v
-                    }
+                    self.sel.seek_scroll(&self.song, 1);
+                    self.sel.cursor_to_scroll(self.s_bwidth)
                 }
                 _ => {}
             }
