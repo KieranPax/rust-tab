@@ -56,8 +56,8 @@ xm                      => Delete measure at cursor (todo)
 
 -- {dur} :
     {n} = 1/{n}
-    {n}. = 1.5/{n}
-    {a}/{b} = {a}/{b}
+    {a}*{b} = {a}/{b}
+    {n}. = 1.5/{n}       -- 3*8 == 4.
     {dur}:{n} = {dur}/{n}
 
 l{dur}(Enter)           => Set duration of beat at cursor

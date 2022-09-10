@@ -265,7 +265,7 @@ impl App {
         let track = self.sel.track(&self.song);
         win.moveto(0, 0)?;
         for i in range {
-            win.print(format!("~{}", track.beats[i].dur))?;
+            win.print("~")?.print(track.beats[i].dur.dur_icon())?;
         }
         win.print("~")?.clear_eoline()?;
         Ok(())

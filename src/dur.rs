@@ -19,6 +19,29 @@ impl Duration {
     pub fn tuple(&self) -> (u8, u8) {
         (*self.0.numer().unwrap(), *self.0.denom().unwrap())
     }
+
+    pub fn dur_icon(&self) -> &'static str {
+        match self.tuple() {
+            (1, 1) => " 1 ",
+            (1, 2) => " 2 ",
+            (1, 4) => " 4 ",
+            (1, 8) => " 8 ",
+            (1, 16) => "16 ",
+            (1, 32) => "32 ",
+            (3, 2) => " 1•",
+            (3, 4) => " 2•",
+            (3, 8) => " 4•",
+            (3, 16) => " 8•",
+            (3, 32) => "16•",
+            (1, 3) => " 2⅓",
+            (1, 6) => " 4⅓",
+            (1, 12) => " 8⅓",
+            (1, 24) => "16⅓",
+            (1, 48) => "32⅓",
+            (1, 96) => "64⅓",
+            _ => " ? ",
+        }
+    }
 }
 
 impl Serialize for Duration {
@@ -62,31 +85,6 @@ impl<'de> Deserialize<'de> for Duration {
     }
 }
 
-impl fmt::Display for Duration {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.tuple() {
-            (1, 1) => f.write_str(" 1 "),
-            (1, 2) => f.write_str(" 2 "),
-            (1, 4) => f.write_str(" 4 "),
-            (1, 8) => f.write_str(" 8 "),
-            (1, 16) => f.write_str("16 "),
-            (1, 32) => f.write_str("32 "),
-            (3, 2) => f.write_str(" 1•"),
-            (3, 4) => f.write_str(" 2•"),
-            (3, 8) => f.write_str(" 4•"),
-            (3, 16) => f.write_str(" 8•"),
-            (3, 32) => f.write_str("16•"),
-            (1, 3) => f.write_str(" 2⅓"),
-            (1, 6) => f.write_str(" 4⅓"),
-            (1, 12) => f.write_str(" 8⅓"),
-            (1, 24) => f.write_str("16⅓"),
-            (1, 48) => f.write_str("32⅓"),
-            (1, 96) => f.write_str("64⅓"),
-            _ => f.write_str(" ? "),
-        }
-    }
-}
-
 impl std::str::FromStr for Duration {
     type Err = Error;
 
@@ -99,7 +97,7 @@ impl std::str::FromStr for Duration {
             "16" => Ok(Self::new(1, 16)),
             "32" => Ok(Self::new(1, 32)),
             _ => {
-                if let Some((a, b)) = s.split_once('/') {
+                if let Some((a, b)) = s.split_once('*') {
                     let (a, b) = (a.parse(), b.parse());
                     if a.is_err() || b.is_err() {
                         Err(Error::InvalidOp(format!("Cannot parse '{s}' as Duration")))
