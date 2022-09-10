@@ -4,7 +4,10 @@ use crate::{
     window,
 };
 use clap::Parser;
-use crossterm::{event, style::Stylize};
+use crossterm::{
+    event::{self, KeyCode},
+    style::Stylize,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -686,53 +689,53 @@ impl App {
         }
     }
 
-    fn key_press(&mut self, key: event::KeyCode) {
+    fn key_press(&mut self, key: KeyCode) {
         if let Some(typing) = self.typing.mut_string() {
             match key {
-                event::KeyCode::Char(c) => {
+                KeyCode::Char(c) => {
                     typing.push(c);
                     if self.typing.is_number_char() && !c.is_digit(10) {
                         self.process_typing().unwrap()
                     }
                 }
-                event::KeyCode::Enter => self.process_typing().unwrap(),
-                event::KeyCode::Backspace => {
+                KeyCode::Enter => self.process_typing().unwrap(),
+                KeyCode::Backspace => {
                     typing.pop();
                 }
                 _ => {}
             }
         } else {
             match key {
-                event::KeyCode::Char('q') | event::KeyCode::Esc => self.should_close = true,
-                event::KeyCode::Char('a') => {
+                KeyCode::Char('q') | KeyCode::Esc => self.should_close = true,
+                KeyCode::Char('a') => {
                     self.sel.seek_beat(&mut self.song, -1);
                     self.sel.scroll_to_cursor(self.s_bwidth)
                 }
-                event::KeyCode::Char('d') => {
+                KeyCode::Char('d') => {
                     self.sel.seek_beat(&mut self.song, 1);
                     self.sel.scroll_to_cursor(self.s_bwidth)
                 }
-                event::KeyCode::Char('w') => self.sel.seek_string(&self.song, -1),
-                event::KeyCode::Char('s') => self.sel.seek_string(&self.song, 1),
-                event::KeyCode::Char('n') => self.typing = Typing::Note(String::new()),
-                event::KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
-                event::KeyCode::Char('x') => self.typing = Typing::Delete(String::new()),
-                event::KeyCode::Char('l') => self.typing = Typing::Duration(String::new()),
-                event::KeyCode::Char('k') => self.typing = Typing::Clear(String::new()),
-                event::KeyCode::Char('v') => self.paste_once(false),
-                event::KeyCode::Char('V') => self.paste_once(true),
-                event::KeyCode::Char(':') => self.typing = Typing::Command(String::new()),
-                event::KeyCode::Char('i') => {
+                KeyCode::Char('w') => self.sel.seek_string(&self.song, -1),
+                KeyCode::Char('s') => self.sel.seek_string(&self.song, 1),
+                KeyCode::Char('n') => self.typing = Typing::Note(String::new()),
+                KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
+                KeyCode::Char('x') => self.typing = Typing::Delete(String::new()),
+                KeyCode::Char('l') => self.typing = Typing::Duration(String::new()),
+                KeyCode::Char('k') => self.typing = Typing::Clear(String::new()),
+                KeyCode::Char('v') => self.paste_once(false),
+                KeyCode::Char('V') => self.paste_once(true),
+                KeyCode::Char(':') => self.typing = Typing::Command(String::new()),
+                KeyCode::Char('i') => {
                     let beat = self.sel.beat(&self.song).copy_duration();
                     self.sel
                         .beats_mut(&mut self.song)
                         .insert(self.sel.beat, beat);
                 }
-                event::KeyCode::Left => {
+                KeyCode::Left => {
                     self.sel.seek_scroll(&self.song, -1);
                     self.sel.cursor_to_scroll(self.s_bwidth)
                 }
-                event::KeyCode::Right => {
+                KeyCode::Right => {
                     self.sel.seek_scroll(&self.song, 1);
                     self.sel.cursor_to_scroll(self.s_bwidth)
                 }
