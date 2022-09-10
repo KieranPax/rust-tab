@@ -282,22 +282,6 @@ impl App {
 
     // Drawing util functions
 
-    fn reset_measure_indices(&mut self) {
-        let mut v = Vec::new();
-        let mut dur = Duration::new(1, 1);
-        let measure_width = Duration::new(1, 1);
-        for (i, beat) in self.sel.beats(&self.song).iter().enumerate() {
-            if dur == measure_width {
-                v.push(i);
-                dur = Duration::new(0, 1);
-            } else if dur > measure_width {
-                dur = dur - measure_width;
-            }
-            dur = dur + beat.dur;
-        }
-        self.song.measure_i = v;
-    }
-
     fn reset_sdim(&mut self, (w, h): (u16, u16)) {
         self.s_bwidth = ((w - 1) / 4) as usize;
         self.s_height = h;
@@ -332,7 +316,7 @@ impl App {
         let track = self.sel.track(&self.song);
         win.moveto(0, string + 1)?;
         for i in range {
-            win.print_styled(if self.song.measure_i.contains(&i) {
+            win.print_styled(if track.is_measure_start(&i) {
                 "|".white()
             } else {
                 "―".grey()
@@ -687,7 +671,7 @@ impl App {
         self.reset_sdim(crossterm::terminal::size().unwrap());
         let mut do_redraw = true;
         while !self.should_close {
-            self.reset_measure_indices();
+            self.sel.track_mut(&mut self.song).update_measures();
             if do_redraw {
                 self.draw(&mut win)?;
             }

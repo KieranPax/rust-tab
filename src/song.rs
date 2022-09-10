@@ -64,6 +64,8 @@ impl Beat {
 pub struct Track {
     pub string_count: u16,
     pub beats: Vec<Beat>,
+    #[serde(skip)]
+    pub measure_i: Vec<usize>,
 }
 
 impl Track {
@@ -71,22 +73,40 @@ impl Track {
         Self {
             string_count: 6,
             beats: vec![Beat::new(Duration::new(1, 1))],
+            measure_i: Vec::new(),
         }
+    }
+
+    pub fn update_measures(&mut self) {
+        let mut v = Vec::new();
+        let mut total = Duration::new(1, 1);
+        let mlen = Duration::new(1, 1);
+        for (i, beat) in self.beats.iter().enumerate() {
+            if total == mlen {
+                v.push(i);
+                total = Duration::new(0, 1);
+            } else if total > mlen {
+                total = total - mlen;
+            }
+            total = total + beat.dur;
+        }
+        self.measure_i = v;
+    }
+
+    pub fn is_measure_start(&self, bindex: &usize) -> bool {
+        self.measure_i.contains(bindex)
     }
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Song {
     pub tracks: Vec<Track>,
-    #[serde(skip)]
-    pub measure_i: Vec<usize>,
 }
 
 impl Song {
     pub fn new() -> Self {
         Self {
             tracks: vec![Track::new()],
-            measure_i: Vec::new(),
         }
     }
 }
