@@ -338,7 +338,7 @@ impl App {
     pub fn new() -> Result<Self> {
         Ok(Self {
             should_close: false,
-            song_path: Some("test_song.json".into()),
+            song_path: None,
             song: Song::new(),
             sel: Selected::new(),
             typing: Typing::None,
