@@ -100,12 +100,15 @@ impl Track {
 #[derive(Serialize, Deserialize)]
 struct Song {
     tracks: Vec<Track>,
+    #[serde(skip)]
+    measure_i: Vec<usize>,
 }
 
 impl Song {
     fn new() -> Self {
         Self {
             tracks: vec![Track::new()],
+            measure_i: Vec::new(),
         }
     }
 }
@@ -272,7 +275,6 @@ pub struct App {
     typing: Typing,
     typing_res: String,
     copy_buffer: Buffer,
-    measure_indices: Vec<usize>,
     s_bwidth: usize,
     s_height: u16,
 }
@@ -288,7 +290,6 @@ impl App {
             typing: Typing::None,
             typing_res: String::new(),
             copy_buffer: Buffer::Empty,
-            measure_indices: Vec::new(),
             s_bwidth: 4,
             s_height: 4,
         })
@@ -373,7 +374,7 @@ impl App {
 
     fn reset_measure_indices(&mut self) {
         let mut v = Vec::new();
-        let mut dur = Duration::new(0, 1);
+        let mut dur = Duration::new(1, 1);
         let measure_width = Duration::new(1, 1);
         for (i, beat) in self.sel.beats(&self.song).iter().enumerate() {
             if dur == measure_width {
@@ -384,7 +385,7 @@ impl App {
             }
             dur = dur + beat.dur;
         }
-        self.measure_indices = v;
+        self.song.measure_i = v;
     }
 
     fn reset_sdim(&mut self, (w, h): (u16, u16)) {
@@ -421,7 +422,7 @@ impl App {
         let track = self.sel.track(&self.song);
         win.moveto(0, string + 1)?;
         for i in range {
-            win.print_styled(if self.measure_indices.contains(&i) {
+            win.print_styled(if self.song.measure_i.contains(&i) {
                 "|".white()
             } else {
                 "―".grey()
@@ -776,8 +777,8 @@ impl App {
         self.reset_sdim(crossterm::terminal::size().unwrap());
         let mut do_redraw = true;
         while !self.should_close {
+            self.reset_measure_indices();
             if do_redraw {
-                self.reset_measure_indices();
                 self.draw(&mut win)?;
             }
             do_redraw = self.proc_event(&mut win)?;
