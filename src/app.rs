@@ -334,6 +334,12 @@ impl App {
             .splice(index..index + count, []);
     }
 
+    // Duration functions
+
+    fn set_duration(&mut self, index: usize, dur: Duration) {
+        self.sel.beat_i_mut(&mut self.song, index).dur = dur;
+    }
+
     // Command processors
 
     fn proc_t_command(&mut self, s_cmd: String) -> Result<String> {
@@ -452,7 +458,7 @@ impl App {
 
     fn proc_t_duration(&mut self, cmd: String) -> Result<String> {
         let dur: Duration = cmd.parse()?;
-        self.sel.beat_mut(&mut self.song).dur = dur;
+        self.set_duration(self.sel.beat, dur);
         Ok(format!("{dur:?}"))
     }
 
