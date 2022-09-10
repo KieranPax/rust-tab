@@ -115,7 +115,7 @@ enum Typing {
     Copy(String),
     Delete(String),
     Duration(String),
-    Clean(String),
+    Clear(String),
 }
 
 impl Typing {
@@ -127,7 +127,7 @@ impl Typing {
             | Typing::Copy(s)
             | Typing::Delete(s)
             | Typing::Duration(s)
-            | Typing::Clean(s) => Some(s),
+            | Typing::Clear(s) => Some(s),
         }
     }
 
@@ -140,7 +140,7 @@ impl Typing {
 
     fn is_number_char(&self) -> bool {
         match self {
-            Typing::Copy(_) | Typing::Delete(_) | Typing::Clean(_) => true,
+            Typing::Copy(_) | Typing::Delete(_) | Typing::Clear(_) => true,
             _ => false,
         }
     }
@@ -155,7 +155,7 @@ impl fmt::Display for Typing {
             Typing::Copy(text) => f.write_fmt(format_args!("copy:{text}")),
             Typing::Delete(text) => f.write_fmt(format_args!("delete:{text}")),
             Typing::Duration(text) => f.write_fmt(format_args!("duration:{text}")),
-            Typing::Clean(text) => f.write_fmt(format_args!("clean:{text}")),
+            Typing::Clear(text) => f.write_fmt(format_args!("clean:{text}")),
         }
     }
 }
@@ -458,6 +458,23 @@ impl App {
         Ok(())
     }
 
+    // Sub-command functions
+
+    fn clear_note(&mut self, index: usize, string: u16) {
+        self.sel.beats_mut(&mut self.song)[index].del_note(string);
+    }
+
+    fn clear_beat(&mut self, index: usize) {
+        self.sel.beats_mut(&mut self.song)[index].notes.clear();
+    }
+
+    fn clear_beats(&mut self, start: usize, count: usize) {
+        let beats = self.sel.beats_mut(&mut self.song);
+        for i in start..start + count {
+            beats[i].notes.clear()
+        }
+    }
+
     // Command processors
 
     fn proc_t_command(&mut self, s_cmd: String) -> Result<String> {
@@ -592,7 +609,7 @@ impl App {
         Ok(format!("{dur:?}"))
     }
 
-    fn proc_t_clean(&mut self, cmd: String) -> Result<String> {
+    fn proc_t_clear(&mut self, cmd: String) -> Result<String> {
         if cmd.len() == 0 {
             Ok(String::new())
         } else {
@@ -600,20 +617,15 @@ impl App {
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => {
-                    let string = self.sel.string;
-                    self.sel.beat_mut(&mut self.song).del_note(string);
+                    self.clear_note(self.sel.beat, self.sel.string);
                     Ok("Note cleared".into())
                 }
                 (Ok(count), "b") => {
-                    let beat = self.sel.beat;
-                    let beats = self.sel.beats_mut(&mut self.song);
-                    for i in beat..beat + count {
-                        beats[i].notes.clear()
-                    }
-                    Ok("Beat cleared".into())
+                    self.clear_beats(self.sel.beat, count);
+                    Ok("{count} Beats cleared".into())
                 }
                 (_, "b") => {
-                    self.sel.beat_mut(&mut self.song).notes.clear();
+                    self.clear_beat(self.sel.beat);
                     Ok("Beat cleared".into())
                 }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
@@ -630,7 +642,7 @@ impl App {
             Typing::Copy(s) => self.proc_t_copy(s),
             Typing::Delete(s) => self.proc_t_delete(s),
             Typing::Duration(s) => self.proc_t_duration(s),
-            Typing::Clean(s) => self.proc_t_clean(s),
+            Typing::Clear(s) => self.proc_t_clear(s),
             Typing::None => panic!("App.typing hasn't been initiated"),
         };
         if let Err(e) = res {
@@ -676,7 +688,7 @@ impl App {
                 event::KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
                 event::KeyCode::Char('x') => self.typing = Typing::Delete(String::new()),
                 event::KeyCode::Char('l') => self.typing = Typing::Duration(String::new()),
-                event::KeyCode::Char('k') => self.typing = Typing::Clean(String::new()),
+                event::KeyCode::Char('k') => self.typing = Typing::Clear(String::new()),
                 event::KeyCode::Char('v') => self.paste_once(false),
                 event::KeyCode::Char('V') => self.paste_once(true),
                 event::KeyCode::Char(':') => self.typing = Typing::Command(String::new()),
