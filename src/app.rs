@@ -219,6 +219,14 @@ impl Selected {
         &mut song.tracks[self.track].beats[self.beat]
     }
 
+    fn beat_i<'a>(&self, song: &'a Song, index: usize) -> &'a Beat {
+        &song.tracks[self.track].beats[index]
+    }
+
+    fn beat_i_mut<'a>(&self, song: &'a mut Song, index: usize) -> &'a mut Beat {
+        &mut song.tracks[self.track].beats[index]
+    }
+
     fn seek_string(&mut self, song: &Song, dire: i16) {
         let new = self.string as i16 + dire;
         self.string = new.clamp(0, self.track(song).string_count as i16 - 1) as u16;
@@ -461,7 +469,7 @@ impl App {
     // Copy functions
 
     fn copy_note(&self, index: usize, string: u16) -> Buffer {
-        if let Some(note) = self.sel.beats(&self.song)[index].get_note(string) {
+        if let Some(note) = self.sel.beat_i(&self.song, index).get_note(string) {
             Buffer::Note(note.clone())
         } else {
             Buffer::Empty
@@ -469,12 +477,12 @@ impl App {
     }
 
     fn copy_beat(&self, index: usize) -> Buffer {
-        Buffer::Beat(self.sel.beats(&self.song)[index].clone())
+        Buffer::Beat(self.sel.beat_i(&self.song, index).clone())
     }
 
     fn copy_beats(&self, index: usize, count: usize) -> Buffer {
-        if let Some(beat) = self.sel.beats(&self.song).get(index..index + count) {
-            Buffer::MultiBeat(beat.to_owned())
+        if let Some(beats) = self.sel.beats(&self.song).get(index..index + count) {
+            Buffer::MultiBeat(beats.to_owned())
         } else {
             Buffer::Empty
         }
@@ -483,11 +491,11 @@ impl App {
     // Clear functions
 
     fn clear_note(&mut self, index: usize, string: u16) {
-        self.sel.beats_mut(&mut self.song)[index].del_note(string);
+        self.sel.beat_i_mut(&mut self.song, index).del_note(string);
     }
 
     fn clear_beat(&mut self, index: usize) {
-        self.sel.beats_mut(&mut self.song)[index].notes.clear();
+        self.sel.beat_i_mut(&mut self.song, index).notes.clear();
     }
 
     fn clear_beats(&mut self, start: usize, count: usize) {
