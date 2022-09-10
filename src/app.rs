@@ -323,34 +323,34 @@ impl App {
 
     // Copy paste functions
 
+    fn paste_note(&mut self, string: u16, fret: u32) {
+        self.sel.beat_mut(&mut self.song).set_note(string, fret);
+    }
+
+    fn paste_beat(&mut self, in_place: bool, index: usize, beat: Beat) {
+        if in_place {
+            self.sel.beats_mut(&mut self.song)[index] = beat;
+        } else {
+            self.sel.beats_mut(&mut self.song).insert(index, beat);
+        }
+    }
+
+    fn paste_multi_beat(&mut self, in_place: bool, index: usize, src: Vec<Beat>) {
+        if in_place {
+            self.sel.beats_mut(&mut self.song).remove(index);
+        }
+        let dest = self.sel.beats_mut(&mut self.song);
+        let after = dest.split_off(index);
+        dest.extend(src);
+        dest.extend(after);
+    }
+
     fn paste_once(&mut self, in_place: bool) {
         match &self.copy_buffer {
             Buffer::Empty => {}
-            Buffer::Note(note) => {
-                let string = self.sel.string;
-                let fret = note.fret;
-                self.sel.beat_mut(&mut self.song).set_note(string, fret);
-            }
-            Buffer::Beat(beat) => {
-                let index = self.sel.beat;
-                let beat = beat.clone();
-                if in_place {
-                    self.sel.beats_mut(&mut self.song)[index] = beat;
-                } else {
-                    self.sel.beats_mut(&mut self.song).insert(index, beat);
-                }
-            }
-            Buffer::MultiBeat(beats) => {
-                let index = self.sel.beat;
-                let src = beats.clone();
-                if in_place {
-                    self.sel.beats_mut(&mut self.song).remove(index);
-                }
-                let dest = self.sel.beats_mut(&mut self.song);
-                let after = dest.split_off(index);
-                dest.extend(src);
-                dest.extend(after);
-            }
+            Buffer::Note(n) => self.paste_note(self.sel.string, n.fret),
+            Buffer::Beat(b) => self.paste_beat(in_place, self.sel.beat, b.clone()),
+            Buffer::MultiBeat(b) => self.paste_multi_beat(in_place, self.sel.beat, b.clone()),
         }
     }
 
