@@ -505,6 +505,18 @@ impl App {
         }
     }
 
+    // Delete functions
+
+    fn delete_beat(&mut self, index: usize) {
+        self.sel.beats_mut(&mut self.song).remove(index);
+    }
+
+    fn delete_beats(&mut self, index: usize, count: usize) {
+        self.sel
+            .beats_mut(&mut self.song)
+            .splice(index..index + count, []);
+    }
+
     // Command processors
 
     fn proc_t_command(&mut self, s_cmd: String) -> Result<String> {
@@ -584,7 +596,7 @@ impl App {
                 (Ok(count), "b") => {
                     self.copy_buffer = self.copy_beats(self.sel.beat, count);
                     match &self.copy_buffer {
-                        Buffer::MultiBeat(_) => Ok(format!("{count} Beats copied")),
+                        Buffer::MultiBeat(_) => Ok(format!("{count} beats copied")),
                         _ => Err(Error::InvalidOp("Copy range out of range".into())),
                     }
                 }
@@ -605,20 +617,15 @@ impl App {
             let a: std::result::Result<usize, _> = a.parse();
             match (a, b) {
                 (_, "n") => {
-                    let string = self.sel.string;
-                    self.sel.beat_mut(&mut self.song).del_note(string);
+                    self.clear_note(self.sel.beat, self.sel.string);
                     Ok("Note deleted".into())
                 }
                 (Ok(count), "b") => {
-                    let beat = self.sel.beat;
-                    self.sel
-                        .beats_mut(&mut self.song)
-                        .splice(beat..beat + count, []);
-                    Ok("Beat deleted".into())
+                    self.delete_beats(self.sel.beat, count);
+                    Ok(format!("{count} beats deleted"))
                 }
                 (_, "b") => {
-                    let beat = self.sel.beat;
-                    self.sel.beats_mut(&mut self.song).remove(beat);
+                    self.delete_beat(self.sel.beat);
                     Ok("Beat deleted".into())
                 }
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
@@ -645,7 +652,7 @@ impl App {
                 }
                 (Ok(count), "b") => {
                     self.clear_beats(self.sel.beat, count);
-                    Ok("{count} Beats cleared".into())
+                    Ok("{count} beats cleared".into())
                 }
                 (_, "b") => {
                     self.clear_beat(self.sel.beat);
