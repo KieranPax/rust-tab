@@ -492,30 +492,6 @@ impl App {
         ))
     }
 
-    fn proc_t_clear(&mut self, cmd: String) -> Result<String> {
-        if cmd.len() == 0 {
-            Ok(String::new())
-        } else {
-            let (a, b) = cmd.split_at(cmd.len() - 1);
-            let a: SResult<usize, _> = a.parse();
-            match (a, b) {
-                (_, "n") => self.push_action(Action::set_note(
-                    self.sel.clone(),
-                    self.sel
-                        .beat(&self.song)
-                        .get_note(self.sel.string)
-                        .map(|n| n.to_owned()),
-                    None,
-                )),
-                (_, "b") => self.push_action(Action::clear_beat(
-                    self.sel.clone(),
-                    self.sel.beat(&self.song).notes.clone(),
-                )),
-                _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
-            }
-        }
-    }
-
     fn push_paste_once(&mut self, in_place: bool) {
         let res = match &self.copy_buf {
             Buffer::Empty => Ok("".into()),
@@ -563,6 +539,24 @@ impl App {
                 "v" => self.push_paste_once(true),
                 "V" => self.push_paste_once(false),
                 "q" => self.should_close = true,
+                "kb" => {
+                    let res = self.push_action(Action::clear_beat(
+                        self.sel.clone(),
+                        self.sel.beat(&self.song).notes.clone(),
+                    ));
+                    self.set_typing_res(res);
+                }
+                "kn" => {
+                    let res = self.push_action(Action::set_note(
+                        self.sel.clone(),
+                        self.sel
+                            .beat(&self.song)
+                            .get_note(self.sel.string)
+                            .map(|n| n.to_owned()),
+                        None,
+                    ));
+                    self.set_typing_res(res);
+                }
                 "k" | "c" | "x" => {}
                 _ => self.typing.clear(),
             }
@@ -633,6 +627,8 @@ impl App {
                 self.sel.seek_beat(&mut self.song, -5);
                 self.sel.scroll_to_cursor(self.s_bwidth);
             }
+            KeyCode::Char('s') => self.sel.seek_string(&mut self.song, 1),
+            KeyCode::Char('w') => self.sel.seek_string(&mut self.song, -1),
             // Start combo
             KeyCode::Char(c) => {
                 self.typing.send_char(c);
