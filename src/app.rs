@@ -409,10 +409,7 @@ impl App {
         if let Ok(note) = Note::parse(&s_note) {
             self.push_action(Action::set_note(
                 self.sel.clone(),
-                self.sel
-                    .beat(&self.song)
-                    .get_note(self.sel.string)
-                    .map(|n| n.to_owned()),
+                self.sel.beat(&self.song).copy_note(self.sel.string),
                 Some(note),
             ))
         } else {
@@ -461,10 +458,7 @@ impl App {
             match (a, b) {
                 (_, "n") => self.push_action(Action::set_note(
                     self.sel.clone(),
-                    self.sel
-                        .beat(&self.song)
-                        .get_note(self.sel.string)
-                        .map(|n| n.to_owned()),
+                    self.sel.beat(&self.song).copy_note(self.sel.string),
                     None,
                 )),
                 (Ok(count), "b") => {
@@ -497,10 +491,7 @@ impl App {
             Buffer::Empty => Ok("".into()),
             Buffer::Note(n) => self.push_action(Action::paste_note(
                 self.sel.clone(),
-                self.sel
-                    .beat(&self.song)
-                    .get_note(self.sel.string)
-                    .map(|n| n.to_owned()),
+                self.sel.beat(&self.song).copy_note(self.sel.string),
                 n.clone(),
             )),
             Buffer::Beat(b) => self.push_action(Action::paste_beat(
@@ -549,10 +540,7 @@ impl App {
                 "kn" => {
                     let res = self.push_action(Action::set_note(
                         self.sel.clone(),
-                        self.sel
-                            .beat(&self.song)
-                            .get_note(self.sel.string)
-                            .map(|n| n.to_owned()),
+                        self.sel.beat(&self.song).copy_note(self.sel.string),
                         None,
                     ));
                     self.set_typing_res(res);

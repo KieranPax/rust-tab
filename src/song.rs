@@ -41,6 +41,15 @@ impl Beat {
         Self::new(self.dur)
     }
 
+    pub fn copy_note(&self, string: u16) -> Option<Note> {
+        for i in self.notes.iter() {
+            if i.0 == string {
+                return Some(i.1.to_owned());
+            }
+        }
+        None
+    }
+
     pub fn get_note(&self, string: u16) -> Option<&Note> {
         for i in self.notes.iter() {
             if i.0 == string {
