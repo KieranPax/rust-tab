@@ -52,14 +52,14 @@ impl Typing {
     }
 
     fn send_char(&mut self, c: char) {
-        if !self.cmd.is_empty() {
-            self.cmd.push(c);
-        } else {
+        if self.cmd.is_empty() {
             if c.is_ascii_digit() {
                 self.count.push(c);
             } else {
                 self.cmd.push(c);
             }
+        } else {
+            self.cmd.push(c);
         }
     }
 
@@ -71,7 +71,7 @@ impl Typing {
         }
     }
 
-    fn parse_count(&self) -> Option<u32> {
+    fn parse_count(&self) -> Option<usize> {
         self.count.parse().ok()
     }
 }
@@ -422,34 +422,6 @@ impl App {
         }
     }
 
-    fn proc_t_delete(&mut self, cmd: String) -> Result<String> {
-        if cmd.len() == 0 {
-            Ok(String::new())
-        } else {
-            let (a, b) = cmd.split_at(cmd.len() - 1);
-            let a: SResult<usize, _> = a.parse();
-            match (a, b) {
-                (_, "n") => self.push_action(Action::set_note(
-                    self.sel.clone(),
-                    self.sel.beat(&self.song).copy_note(self.sel.string),
-                    None,
-                )),
-                (Ok(count), "b") => {
-                    if let Some(b) = self.sel.beats_slice(&self.song, count) {
-                        self.push_action(Action::delete_beats(self.sel.clone(), b.to_owned()))
-                    } else {
-                        Err(Error::InvalidOp("Tried to delete out of bounds".into()))
-                    }
-                }
-                (_, "b") => self.push_action(Action::delete_beat(
-                    self.sel.clone(),
-                    self.sel.beat(&self.song).clone(),
-                )),
-                _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
-            }
-        }
-    }
-
     fn proc_t_duration(&mut self, cmd: String) -> Result<String> {
         let dur = Duration::parse(&cmd)?;
         self.push_action(Action::set_duration(
@@ -529,6 +501,7 @@ impl App {
         }
         if !cmd.starts_with(':') {
             match cmd.as_str() {
+                "k" | "c" | "x" | "n" | "" => {}
                 "z" => {
                     let res = self.undo();
                     self.set_typing_res(res);
@@ -547,7 +520,7 @@ impl App {
                     ));
                     self.set_typing_res(res);
                 }
-                "kn" => {
+                "kn" | "xn" => {
                     let res = self.push_action(Action::set_note(
                         self.sel.clone(),
                         self.sel.beat(&self.song).copy_note(self.sel.string),
@@ -555,7 +528,21 @@ impl App {
                     ));
                     self.set_typing_res(res);
                 }
-                "k" | "c" | "x" | "n" => {}
+                "xb" => {
+                    let res = if let Some(count) = self.typing.parse_count() {
+                        if let Some(b) = self.sel.beats_slice(&self.song, count) {
+                            self.push_action(Action::delete_beats(self.sel.clone(), b.to_owned()))
+                        } else {
+                            Err(Error::InvalidOp("Tried to delete out of bounds".into()))
+                        }
+                    } else {
+                        self.push_action(Action::delete_beat(
+                            self.sel.clone(),
+                            self.sel.beat(&self.song).clone(),
+                        ))
+                    };
+                    self.set_typing_res(res);
+                }
                 _ => self.typing.clear(),
             }
         }
