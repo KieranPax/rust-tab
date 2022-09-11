@@ -52,6 +52,9 @@ xb                      => Delete beat at cursor
 xm                      => Delete measure at cursor (todo)
 {n}xm                   => Delete n measures from cursor (todo)
 
+i                       => Insert beat at cursor
+{n}i                    => Insert n beats at cursor
+
 -- {dur} :
     {n} = 1/{n}
     {a}*{b} = {a}/{b}
@@ -60,7 +63,6 @@ xm                      => Delete measure at cursor (todo)
 
 l{dur}(Enter)           => Set duration of beat at cursor
 {n}l{dur}(Enter)        => Set duration of n beats from cursor
-(shift)L{dur}(Enter)    => Set duration of beats in measure at cursor
 
 :load {path}(Enter)     => Load song from {path} (and set as default location)
 :save(Enter)            => Save song into default location

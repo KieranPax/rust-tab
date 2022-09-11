@@ -543,6 +543,19 @@ impl App {
                     };
                     self.set_typing_res(res);
                 }
+                "i" => {
+                    let beat = self.sel.beat(&self.song).copy_duration();
+                    let res = if let Some(count) = self.typing.parse_count() {
+                        self.push_action(Action::paste_beats(
+                            self.sel.clone(),
+                            None,
+                            vec![beat.clone(); count],
+                        ))
+                    } else {
+                        self.push_action(Action::paste_beat(self.sel.clone(), None, beat))
+                    };
+                    self.set_typing_res(res);
+                }
                 _ => self.typing.clear(),
             }
         }
