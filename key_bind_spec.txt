@@ -42,7 +42,6 @@ Z                       => Redo (todo)
 
 kn                      => Delete note at cursor
 kb                      => Clear notes from beat at cursor
-{n}kb                   => Clear notes from n beats from cursor
 km                      => Clear notes of measure at cursor (todo)
 {n}km                   => Clear notes of n measures from cursor (todo)
 k(shift)m               => Clear beats of measure at cursor (todo)

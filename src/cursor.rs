@@ -105,13 +105,6 @@ impl Cursor {
         self.beat_mut(song).notes.clear();
     }
 
-    pub fn clear_beats(&self, song: &mut Song, count: usize) {
-        let beats = self.beats_mut(song);
-        for i in self.beat..self.beat + count {
-            beats[i].notes.clear()
-        }
-    }
-
     pub fn delete_beat(&self, song: &mut Song) {
         self.beats_mut(song).remove(self.beat);
         self.track_mut(song).update_measures();

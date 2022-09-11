@@ -491,10 +491,6 @@ impl App {
                         .map(|n| n.fret),
                     None,
                 )),
-                (Ok(count), "b") => {
-                    self.sel.clear_beats(&mut self.song, count);
-                    Ok("{count} beats cleared".into())
-                }
                 (_, "b") => self.push_action(Action::clear_beat(
                     self.sel.clone(),
                     self.sel.beat(&self.song).notes.clone(),
