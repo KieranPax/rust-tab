@@ -4,7 +4,7 @@ use crate::{
     dur::Duration,
     error::{Error, Result, SResult},
     history::{Action, History},
-    song::{Note, Song, Track},
+    song::{Note, Song},
     window,
 };
 use clap::Parser;
@@ -43,7 +43,7 @@ impl Typing {
     }
 
     fn display(&self) -> String {
-        format!("{}{}", self.count, self.cmd)
+        format!("{} {}", self.count, self.cmd)
     }
 
     fn clear(&mut self) {
@@ -378,20 +378,6 @@ impl App {
         }
     }
 
-    fn proc_t_note_edit(&mut self, s_note: String) -> Result<String> {
-        if let Ok(note) = Note::parse(&s_note) {
-            self.push_action(Action::set_note(
-                self.sel.clone(),
-                self.sel.beat(&self.song).copy_note(self.sel.string),
-                Some(note),
-            ))
-        } else {
-            Err(Error::MalformedCmd(format!(
-                "Cannot parse {s_note:?} as int"
-            )))
-        }
-    }
-
     fn proc_t_copy(&mut self, cmd: String) -> Result<String> {
         if cmd.len() == 0 {
             Ok(String::new())
@@ -420,15 +406,6 @@ impl App {
                 _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
             }
         }
-    }
-
-    fn proc_t_duration(&mut self, cmd: String) -> Result<String> {
-        let dur = Duration::parse(&cmd)?;
-        self.push_action(Action::set_duration(
-            self.sel.clone(),
-            self.sel.beat(&self.song).dur,
-            dur,
-        ))
     }
 
     fn push_paste_once(&mut self, in_place: bool) {
@@ -479,6 +456,9 @@ impl App {
 
     fn check_typing(&mut self) {
         let cmd = &self.typing.cmd;
+        if cmd.starts_with("l") {
+            return;
+        }
         if cmd.len() > 1 && cmd.starts_with("n") {
             let last = cmd.chars().last().unwrap();
             if !(last.is_ascii_digit() || last == 'x') {
@@ -569,6 +549,18 @@ impl App {
         } else if self.typing.cmd.starts_with('n') {
             let s = self.typing.cmd.get(1..).unwrap().to_owned();
             self.apply_note(&s);
+            self.typing.clear();
+        } else if self.typing.cmd.starts_with('l') {
+            let s = self.typing.cmd.get(1..).unwrap();
+            let res = match Duration::parse(s) {
+                Ok(dur) => self.push_action(Action::set_duration(
+                    self.sel.clone(),
+                    self.sel.beat(&self.song).dur,
+                    dur,
+                )),
+                Err(e) => Err(e),
+            };
+            self.set_typing_res(res);
             self.typing.clear();
         } else {
             self.set_typing_res(Ok(""));
