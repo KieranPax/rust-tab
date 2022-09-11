@@ -13,12 +13,12 @@ pub enum Action {
     },
     SetNote {
         cur: Cursor,
-        old: Option<u16>,
-        new: Option<u16>,
+        old: Option<Note>,
+        new: Option<Note>,
     },
     ClearBeat {
         cur: Cursor,
-        old: Vec<Note>,
+        old: Vec<(u16, Note)>,
     },
     DeleteBeat {
         cur: Cursor,
@@ -50,11 +50,11 @@ impl Action {
         Self::SetDuration { cur, old, new }
     }
 
-    pub fn set_note(cur: Cursor, old: Option<u16>, new: Option<u16>) -> Self {
+    pub fn set_note(cur: Cursor, old: Option<Note>, new: Option<Note>) -> Self {
         Self::SetNote { cur, old, new }
     }
 
-    pub fn clear_beat(cur: Cursor, old: Vec<Note>) -> Self {
+    pub fn clear_beat(cur: Cursor, old: Vec<(u16, Note)>) -> Self {
         Self::ClearBeat { cur, old }
     }
 

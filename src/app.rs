@@ -4,7 +4,7 @@ use crate::{
     dur::Duration,
     error::{Error, Result, SResult},
     history::{Action, History},
-    song::{Song, Track},
+    song::{Note, Song, Track},
     window,
 };
 use clap::Parser;
@@ -135,8 +135,8 @@ impl App {
                 Ok(format!("Set duration {}/{}", new.num(), new.dem()))
             }
             Action::SetNote { cur, new, .. } => {
-                if let Some(fret) = *new {
-                    cur.set_note(&mut self.song, fret);
+                if let Some(note) = new {
+                    cur.set_note(&mut self.song, note.to_owned());
                     Ok("Set note".into())
                 } else {
                     cur.clear_note(&mut self.song);
@@ -156,7 +156,7 @@ impl App {
                 Ok("Undo delete beat".into())
             }
             Action::PasteNote { cur, buf, .. } => {
-                cur.set_note(&mut self.song, buf.fret);
+                cur.set_note(&mut self.song, buf.clone());
                 Ok("Paste note".into())
             }
             Action::PasteBeat { cur, old, buf } => {
@@ -177,8 +177,8 @@ impl App {
                 Ok("Undo set duration".into())
             }
             Action::SetNote { cur, old, new } => {
-                if let Some(fret) = *old {
-                    cur.set_note(&mut self.song, fret);
+                if let Some(note) = old {
+                    cur.set_note(&mut self.song, note.clone());
                 } else {
                     cur.clear_note(&mut self.song);
                 }
@@ -202,7 +202,7 @@ impl App {
             }
             Action::PasteNote { cur, old, .. } => {
                 if let Some(note) = old {
-                    cur.set_note(&mut self.song, note.fret);
+                    cur.set_note(&mut self.song, note.clone());
                 } else {
                     cur.clear_note(&mut self.song);
                 }
@@ -331,14 +331,11 @@ impl App {
             } else {
                 "―".grey()
             })?;
-            let inner: String = if let Some(val) = track.beats[i].get_note(string) {
-                if val.fret > 999 {
-                    "###".into()
-                } else {
-                    format!("{: ^3}", val.fret)
-                }
-            } else {
-                "―――".into()
+            let inner = match track.beats[i].get_note(string) {
+                Some(Note::Fret(fret)) if fret > &999 => "###".into(),
+                Some(Note::Fret(fret)) => format!("{: ^3}", fret),
+                Some(Note::X) => " X ".into(),
+                None => "―――".into(),
             };
             if self.sel.beat == i {
                 win.print_styled(if self.sel.string == string {
@@ -401,9 +398,9 @@ impl App {
             },
             "n" => match cmd.get(1) {
                 Some(s) => {
-                    if let Ok(fret) = s.parse::<u16>() {
+                    if let Ok(note) = Note::parse(s) {
                         let string = self.sel.string;
-                        self.sel.beat_mut(&mut self.song).set_note(string, fret);
+                        self.sel.beat_mut(&mut self.song).set_note(string, note);
                         Ok(format!(
                             "Note count : {}",
                             self.sel.beat(&self.song).notes.len()
@@ -424,19 +421,19 @@ impl App {
         }
     }
 
-    fn proc_t_note_edit(&mut self, s_fret: String) -> Result<String> {
-        if let Ok(fret) = s_fret.parse() {
+    fn proc_t_note_edit(&mut self, s_note: String) -> Result<String> {
+        if let Ok(note) = Note::parse(&s_note) {
             self.push_action(Action::set_note(
                 self.sel.clone(),
                 self.sel
                     .beat(&self.song)
                     .get_note(self.sel.string)
-                    .map(|n| n.fret),
-                Some(fret),
+                    .map(|n| n.to_owned()),
+                Some(note),
             ))
         } else {
             Err(Error::MalformedCmd(format!(
-                "Cannot parse {s_fret:?} as int"
+                "Cannot parse {s_note:?} as int"
             )))
         }
     }
@@ -483,7 +480,7 @@ impl App {
                     self.sel
                         .beat(&self.song)
                         .get_note(self.sel.string)
-                        .map(|n| n.fret),
+                        .map(|n| n.to_owned()),
                     None,
                 )),
                 (Ok(count), "b") => {
@@ -523,7 +520,7 @@ impl App {
                     self.sel
                         .beat(&self.song)
                         .get_note(self.sel.string)
-                        .map(|n| n.fret),
+                        .map(|n| n.to_owned()),
                     None,
                 )),
                 (_, "b") => self.push_action(Action::clear_beat(

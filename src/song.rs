@@ -1,22 +1,32 @@
-use crate::dur::Duration;
+use crate::{
+    dur::Duration,
+    error::{Error, Result},
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Note {
-    pub string: u16,
-    pub fret: u16,
+#[serde(untagged)]
+pub enum Note {
+    Fret(u16),
+    X,
 }
 
 impl Note {
-    pub fn new(string: u16, fret: u16) -> Self {
-        Self { string, fret }
+    pub fn parse(s: &str) -> Result<Self> {
+        if s == "x" {
+            Ok(Self::X)
+        } else if let Ok(fret) = s.parse() {
+            Ok(Self::Fret(fret))
+        } else {
+            Err(Error::InvalidOp(format!("Cannot parse '{s}' as note")))
+        }
     }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Beat {
     pub dur: Duration,
-    pub notes: Vec<Note>,
+    pub notes: Vec<(u16, Note)>,
 }
 
 impl Beat {
@@ -33,26 +43,26 @@ impl Beat {
 
     pub fn get_note(&self, string: u16) -> Option<&Note> {
         for i in self.notes.iter() {
-            if i.string == string {
-                return Some(i);
+            if i.0 == string {
+                return Some(&i.1);
             }
         }
         None
     }
 
-    pub fn set_note(&mut self, string: u16, fret: u16) {
+    pub fn set_note(&mut self, string: u16, note: Note) {
         for i in self.notes.iter_mut() {
-            if i.string == string {
-                i.fret = fret;
+            if i.0 == string {
+                i.1 = note;
                 return;
             }
         }
-        self.notes.push(Note::new(string, fret))
+        self.notes.push((string, note));
     }
 
     pub fn del_note(&mut self, string: u16) {
         for i in 0..self.notes.len() {
-            if self.notes[i].string == string {
+            if self.notes[i].0 == string {
                 self.notes.swap_remove(i);
                 return;
             }

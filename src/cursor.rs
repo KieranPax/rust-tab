@@ -89,11 +89,11 @@ impl Cursor {
         self.track_mut(song).update_measures();
     }
 
-    pub fn set_note(&self, song: &mut Song, fret: u16) {
-        self.beat_mut(song).set_note(self.string, fret);
+    pub fn set_note(&self, song: &mut Song, note: Note) {
+        self.beat_mut(song).set_note(self.string, note);
     }
 
-    pub fn set_notes(&self, song: &mut Song, notes: Vec<Note>) {
+    pub fn set_notes(&self, song: &mut Song, notes: Vec<(u16, Note)>) {
         self.beat_mut(song).notes = notes;
     }
 
