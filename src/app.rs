@@ -62,6 +62,14 @@ impl Typing {
             }
         }
     }
+
+    fn backspace(&mut self) {
+        if !self.cmd.is_empty() {
+            self.cmd.pop();
+        } else {
+            self.count.pop();
+        }
+    }
 }
 
 pub struct App {
@@ -477,9 +485,46 @@ impl App {
         self.set_typing_res(res);
     }
 
+    fn apply_note(&mut self, note_str: &str) {
+        if note_str.is_empty() {
+            return;
+        }
+        let note = Note::parse(note_str);
+        let res = match note {
+            Ok(note) => self.push_action(Action::set_note(
+                self.sel.clone(),
+                self.sel.beat(&self.song).copy_note(self.sel.string),
+                Some(note),
+            )),
+            Err(e) => Err(e),
+        };
+        self.set_typing_res(res);
+    }
+
     fn check_typing(&mut self) {
-        if !self.typing.cmd.starts_with(':') {
-            match self.typing.cmd.as_str() {
+        let cmd = &self.typing.cmd;
+        if cmd.len() > 1 && cmd.starts_with("n") {
+            let last = cmd.chars().last().unwrap();
+            if !(last.is_ascii_digit() || last == 'x') {
+                let s = cmd.get(1..cmd.len() - 1).unwrap().to_owned();
+                self.apply_note(&s);
+                self.typing.clear();
+                match last {
+                    'n' => {
+                        self.sel.seek_beat(&mut self.song, 1);
+                        self.typing.send_char('n');
+                    }
+                    'd' => self.sel.seek_beat(&mut self.song, 1),
+                    'a' => self.sel.seek_beat(&mut self.song, -1),
+                    's' => self.sel.seek_string(&self.song, 1),
+                    'w' => self.sel.seek_string(&self.song, -1),
+                    _ => {}
+                }
+            }
+            return;
+        }
+        if !cmd.starts_with(':') {
+            match cmd.as_str() {
                 "z" => {
                     let res = self.undo();
                     self.set_typing_res(res);
@@ -506,7 +551,7 @@ impl App {
                     ));
                     self.set_typing_res(res);
                 }
-                "k" | "c" | "x" => {}
+                "k" | "c" | "x" | "n" => {}
                 _ => self.typing.clear(),
             }
         }
@@ -517,6 +562,10 @@ impl App {
             let cmd = self.typing.cmd.get(1..).unwrap().to_owned();
             let res = self.proc_t_command(cmd);
             self.set_typing_res(res);
+        } else if self.typing.cmd.starts_with('n') {
+            let s = self.typing.cmd.get(1..).unwrap().to_owned();
+            self.apply_note(&s);
+            self.typing.clear();
         } else {
             self.set_typing_res(Ok(""));
         }
@@ -529,6 +578,11 @@ impl App {
         if self.typing.is_recieving() {
             if let KeyCode::Char(c) = key {
                 self.typing.send_char(c);
+                self.check_typing();
+                return;
+            }
+            if let KeyCode::Backspace = key {
+                self.typing.backspace();
                 self.check_typing();
                 return;
             }
