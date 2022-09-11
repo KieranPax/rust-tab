@@ -9,10 +9,9 @@ use crate::{
 };
 use clap::Parser;
 use crossterm::{
-    event::{self, KeyCode},
+    event::{self, KeyCode, KeyModifiers},
     style::Stylize,
 };
-use std::fmt;
 
 #[derive(Parser, Debug)]
 #[clap(name = "rust-tab")]
@@ -26,55 +25,41 @@ struct Args {
 
 type BeatRange = std::ops::Range<usize>;
 
-#[derive(Clone)]
-enum Typing {
-    None,
-    Command(String),
-    Note(String),
-    Copy(String),
-    Delete(String),
-    Duration(String),
-    Clear(String),
+struct Typing {
+    count: String,
+    cmd: String,
 }
 
 impl Typing {
-    fn mut_string(&mut self) -> Option<&mut String> {
-        match self {
-            Typing::None => None,
-            Typing::Command(s)
-            | Typing::Note(s)
-            | Typing::Copy(s)
-            | Typing::Delete(s)
-            | Typing::Duration(s)
-            | Typing::Clear(s) => Some(s),
+    fn new() -> Self {
+        Self {
+            count: String::new(),
+            cmd: String::new(),
         }
     }
 
-    fn is_none(&self) -> bool {
-        match self {
-            Typing::None => true,
-            _ => false,
-        }
+    fn is_recieving(&self) -> bool {
+        !(self.cmd.is_empty() && self.count.is_empty())
     }
 
-    fn is_number_char(&self) -> bool {
-        match self {
-            Typing::Copy(_) | Typing::Delete(_) | Typing::Clear(_) => true,
-            _ => false,
-        }
+    fn display(&self) -> String {
+        format!("{}{}", self.count, self.cmd)
     }
-}
 
-impl fmt::Display for Typing {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Typing::None => Ok(()),
-            Typing::Command(text) => f.write_fmt(format_args!("cmd:{text}")),
-            Typing::Note(text) => f.write_fmt(format_args!("note:{text}")),
-            Typing::Copy(text) => f.write_fmt(format_args!("copy:{text}")),
-            Typing::Delete(text) => f.write_fmt(format_args!("delete:{text}")),
-            Typing::Duration(text) => f.write_fmt(format_args!("duration:{text}")),
-            Typing::Clear(text) => f.write_fmt(format_args!("clean:{text}")),
+    fn clear(&mut self) {
+        self.count.clear();
+        self.cmd.clear();
+    }
+
+    fn send_char(&mut self, c: char) {
+        if !self.cmd.is_empty() {
+            self.cmd.push(c);
+        } else {
+            if c.is_ascii_digit() {
+                self.count.push(c);
+            } else {
+                self.cmd.push(c);
+            }
         }
     }
 }
@@ -101,7 +86,7 @@ impl App {
             song_path: None,
             song: Song::new(),
             sel: Cursor::new(),
-            typing: Typing::None,
+            typing: Typing::new(),
             typing_res: String::new(),
             copy_buf: Buffer::Empty,
             s_bwidth: 4,
@@ -290,10 +275,10 @@ impl App {
     }
 
     fn gen_status_msg(&self) -> String {
-        if self.typing.is_none() {
-            format!("{} | buffer : {:?}", self.typing_res, self.copy_buf)
+        if self.typing.is_recieving() {
+            format!(">{}< | buffer : {:?}", self.typing.display(), self.copy_buf)
         } else {
-            format!("{} $ buffer : {:?}", self.typing, self.copy_buf)
+            format!("{} | buffer : {:?}", self.typing_res, self.copy_buf)
         }
     }
 
@@ -302,12 +287,11 @@ impl App {
         T: Into<String>,
     {
         if let Err(e) = res {
-            self.typing = Typing::None;
             self.typing_res = format!("{e}");
         } else {
-            self.typing = Typing::None;
             self.typing_res = res.unwrap().into();
         }
+        self.typing.clear();
     }
 
     // Draw functions
@@ -532,7 +516,7 @@ impl App {
         }
     }
 
-    fn paste_once(&mut self, in_place: bool) {
+    fn push_paste_once(&mut self, in_place: bool) {
         let res = match &self.copy_buf {
             Buffer::Empty => Ok("".into()),
             Buffer::Note(n) => self.push_action(Action::paste_note(
@@ -565,81 +549,96 @@ impl App {
         self.set_typing_res(res);
     }
 
-    // Raw event processors
-
-    fn process_typing(&mut self) {
-        let res = match self.typing.clone() {
-            Typing::Command(s) => self.proc_t_command(s),
-            Typing::Note(s) => self.proc_t_note_edit(s),
-            Typing::Copy(s) => self.proc_t_copy(s),
-            Typing::Delete(s) => self.proc_t_delete(s),
-            Typing::Duration(s) => self.proc_t_duration(s),
-            Typing::Clear(s) => self.proc_t_clear(s),
-            Typing::None => panic!("App.typing hasn't been initiated"),
-        };
-        self.set_typing_res(res);
-    }
-
-    fn key_press(&mut self, key: KeyCode) {
-        if let Some(typing) = self.typing.mut_string() {
-            match key {
-                KeyCode::Char(c) => {
-                    typing.push(c);
-                    if self.typing.is_number_char() && !c.is_digit(10) {
-                        self.process_typing()
-                    }
-                }
-                KeyCode::Enter => self.process_typing(),
-                KeyCode::Backspace => {
-                    typing.pop();
-                }
-                _ => {}
-            }
-        } else {
-            match key {
-                KeyCode::Char('q') | KeyCode::Esc => self.should_close = true,
-                KeyCode::Char('a') => {
-                    self.sel.seek_beat(&mut self.song, -1);
-                    self.sel.scroll_to_cursor(self.s_bwidth)
-                }
-                KeyCode::Char('d') => {
-                    self.sel.seek_beat(&mut self.song, 1);
-                    self.sel.scroll_to_cursor(self.s_bwidth)
-                }
-                KeyCode::Char('w') => self.sel.seek_string(&self.song, -1),
-                KeyCode::Char('s') => self.sel.seek_string(&self.song, 1),
-                KeyCode::Char('n') => self.typing = Typing::Note(String::new()),
-                KeyCode::Char('c') => self.typing = Typing::Copy(String::new()),
-                KeyCode::Char('x') => self.typing = Typing::Delete(String::new()),
-                KeyCode::Char('l') => self.typing = Typing::Duration(String::new()),
-                KeyCode::Char('k') => self.typing = Typing::Clear(String::new()),
-                KeyCode::Char('v') => self.paste_once(false),
-                KeyCode::Char('V') => self.paste_once(true),
-                KeyCode::Char('z') => {
+    fn check_typing(&mut self) {
+        if !self.typing.cmd.starts_with(':') {
+            match self.typing.cmd.as_str() {
+                "z" => {
                     let res = self.undo();
                     self.set_typing_res(res);
                 }
-                KeyCode::Char('Z') => {
+                "Z" => {
                     let res = self.redo();
                     self.set_typing_res(res);
                 }
-                KeyCode::Char(':') => self.typing = Typing::Command(String::new()),
-                KeyCode::Char('i') => {
-                    let beat = self.sel.beat(&self.song).copy_duration();
-                    self.sel
-                        .beats_mut(&mut self.song)
-                        .insert(self.sel.beat, beat);
-                }
-                KeyCode::Left => {
-                    self.sel.seek_scroll(&self.song, -1);
-                    self.sel.cursor_to_scroll(self.s_bwidth)
-                }
-                KeyCode::Right => {
-                    self.sel.seek_scroll(&self.song, 1);
-                    self.sel.cursor_to_scroll(self.s_bwidth)
-                }
-                _ => {}
+                "v" => self.push_paste_once(true),
+                "V" => self.push_paste_once(false),
+                "q" => self.should_close = true,
+                "k" | "c" | "x" => {}
+                _ => self.typing.clear(),
             }
+        }
+    }
+
+    fn confirm_typing(&mut self) {
+        if self.typing.cmd.starts_with(':') {
+            let cmd = self.typing.cmd.get(1..).unwrap().to_owned();
+            let res = self.proc_t_command(cmd);
+            self.set_typing_res(res);
+        } else {
+            self.set_typing_res(Ok(""));
+        }
+        self.typing.clear();
+    }
+
+    // Raw event processors
+
+    fn key_press(&mut self, key: KeyCode, modi: KeyModifiers) {
+        if self.typing.is_recieving() {
+            if let KeyCode::Char(c) = key {
+                self.typing.send_char(c);
+                self.check_typing();
+                return;
+            }
+        }
+        match key {
+            // Combo
+            KeyCode::Esc => {
+                if self.typing.is_recieving() {
+                    self.typing.clear();
+                } else {
+                    self.should_close = true;
+                }
+            }
+            KeyCode::Enter => self.confirm_typing(),
+            // Cursor movement and scroll
+            KeyCode::Right => {
+                if modi.contains(KeyModifiers::SHIFT) {
+                    self.sel.seek_scroll(&self.song, 5)
+                } else {
+                    self.sel.seek_scroll(&self.song, 1)
+                }
+                self.sel.cursor_to_scroll(self.s_bwidth);
+            }
+            KeyCode::Left => {
+                if modi.contains(KeyModifiers::SHIFT) {
+                    self.sel.seek_scroll(&self.song, -5)
+                } else {
+                    self.sel.seek_scroll(&self.song, -1)
+                }
+                self.sel.cursor_to_scroll(self.s_bwidth);
+            }
+            KeyCode::Char('d') => {
+                self.sel.seek_beat(&mut self.song, 1);
+                self.sel.scroll_to_cursor(self.s_bwidth);
+            }
+            KeyCode::Char('a') => {
+                self.sel.seek_beat(&mut self.song, -1);
+                self.sel.scroll_to_cursor(self.s_bwidth);
+            }
+            KeyCode::Char('D') => {
+                self.sel.seek_beat(&mut self.song, 5);
+                self.sel.scroll_to_cursor(self.s_bwidth);
+            }
+            KeyCode::Char('A') => {
+                self.sel.seek_beat(&mut self.song, -5);
+                self.sel.scroll_to_cursor(self.s_bwidth);
+            }
+            // Start combo
+            KeyCode::Char(c) => {
+                self.typing.send_char(c);
+                self.check_typing();
+            }
+            _ => {}
         }
     }
 
@@ -647,8 +646,10 @@ impl App {
         match win.get_event() {
             Ok(e) => match e {
                 event::Event::Key(e) => match e {
-                    event::KeyEvent { code, .. } => {
-                        self.key_press(code);
+                    event::KeyEvent {
+                        code, modifiers, ..
+                    } => {
+                        self.key_press(code, modifiers);
                         Ok(true)
                     }
                 },

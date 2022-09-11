@@ -10,8 +10,8 @@ w                       => Move cursor up
 s                       => Move cursor down
 (Right)                 => Scroll screen forward
 (Left)                  => Scroll screen back
-(shift)d                => Move cursor forward 1 measure
-(shift)a                => Move cursor back 1 measure
+(shift)D                => Move cursor forward 1 measure
+(shift)A                => Move cursor back 1 measure
 (Home)                  => Move cursor back 1 section
 (End)                   => Move cursor forward 1 section
 
@@ -34,18 +34,18 @@ cm                      => Copy beats of measure at cursor
 cl                      => Copy duration of beat at cursor
 
 v                       => Insert contents of buffer at cursor
-(shift)v                => Place contents of buffer at cursor 
+(shift)V                => Place contents of buffer at cursor 
 --          (overwrite single beat/measure) (only valid for cb/cm)
 
 z                       => Undo (todo)
-Z                       => Redo (todo)
+(shift)Z                => Redo (todo)
 
 kn                      => Delete note at cursor
 kb                      => Clear notes from beat at cursor
 km                      => Clear notes of measure at cursor (todo)
 {n}km                   => Clear notes of n measures from cursor (todo)
-k(shift)m               => Clear beats of measure at cursor (todo)
-{n}k(shift)m            => Clear beats of n measures from cursor (todo)
+k(shift)M               => Clear beats of measure at cursor (todo)
+{n}k(shift)M            => Clear beats of n measures from cursor (todo)
 
 xn                      => Delete note at cursor
 xb                      => Delete beat at cursor
@@ -61,4 +61,9 @@ xm                      => Delete measure at cursor (todo)
 
 l{dur}(Enter)           => Set duration of beat at cursor
 {n}l{dur}(Enter)        => Set duration of n beats from cursor
-(shift)l{dur}(Enter)    => Set duration of beats in measure at cursor
+(shift)L{dur}(Enter)    => Set duration of beats in measure at cursor
+
+:load {path}(Enter)     => Load song from {path} (and set as default location)
+:save(Enter)            => Save song into default location
+:save {path}(Enter)     => Save song into specified {path} (and set as default location)
+:export gp5(Enter)      => Save song as gp5 into default location (with .gp5)
