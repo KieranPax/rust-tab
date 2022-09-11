@@ -359,48 +359,9 @@ impl App {
 
     fn proc_t_command(&mut self, s_cmd: String) -> Result<String> {
         let cmd: Vec<_> = s_cmd.split(' ').collect();
-        match cmd[0] {
-            "" => Ok(String::new()),
-            "t" => match cmd.get(1) {
-                Some(&"add") => {
-                    self.song.tracks.push(Track::new());
-                    Ok(format!("Added track [{}]", self.song.tracks.len() - 1))
-                }
-                Some(s) => {
-                    if let Ok(index) = s.parse() {
-                        self.sel.track = index;
-                        Ok(format!("Switched to track [{index}]"))
-                    } else {
-                        Err(Error::UnknownCmd(s_cmd))
-                    }
-                }
-                None => Err(Error::MalformedCmd(s_cmd)),
-            },
-            "b" => match cmd.get(1) {
-                Some(_) => Err(Error::UnknownCmd(s_cmd)),
-                None => Err(Error::MalformedCmd(s_cmd)),
-            },
-            "n" => match cmd.get(1) {
-                Some(s) => {
-                    if let Ok(note) = Note::parse(s) {
-                        let string = self.sel.string;
-                        self.sel.beat_mut(&mut self.song).set_note(string, note);
-                        Ok(format!(
-                            "Note count : {}",
-                            self.sel.beat(&self.song).notes.len()
-                        ))
-                    } else {
-                        Err(Error::UnknownCmd(s_cmd))
-                    }
-                }
-                None => Err(Error::MalformedCmd(s_cmd)),
-            },
-            "f" => match cmd.get(1) {
-                Some(&"save") => self.try_save_file(cmd.get(2)),
-                Some(&"load") => self.try_load_file(cmd.get(2)),
-                Some(_) => Err(Error::UnknownCmd(s_cmd)),
-                None => Err(Error::MalformedCmd(s_cmd)),
-            },
+        match cmd.get(0) {
+            Some(&"save") => self.try_save_file(cmd.get(1)),
+            Some(&"load") => self.try_load_file(cmd.get(1)),
             _ => Err(Error::UnknownCmd(s_cmd)),
         }
     }
