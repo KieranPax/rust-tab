@@ -155,6 +155,18 @@ impl App {
                 cur.delete_beats(&mut self.song, old.len());
                 Ok("Undo delete beat".into())
             }
+            Action::PasteNote { cur, buf, .. } => {
+                cur.set_note(&mut self.song, buf.fret);
+                Ok("Paste note".into())
+            }
+            Action::PasteBeat { cur, old, buf } => {
+                cur.insert_beat(&mut self.song, old.is_some(), buf.clone());
+                Ok("Paste beat".into())
+            }
+            Action::PasteBeats { cur, old, buf } => {
+                cur.insert_beats(&mut self.song, old.is_some(), buf.clone());
+                Ok("Paste beats".into())
+            }
         }
     }
 
@@ -187,6 +199,29 @@ impl App {
             Action::DeleteBeats { cur, old } => {
                 cur.insert_beats(&mut self.song, false, old.clone());
                 Ok("Undo delete beat".into())
+            }
+            Action::PasteNote { cur, old, .. } => {
+                if let Some(note) = old {
+                    cur.set_note(&mut self.song, note.fret);
+                } else {
+                    cur.clear_note(&mut self.song);
+                }
+                Ok("Undo paste note".into())
+            }
+            Action::PasteBeat { cur, old, .. } => {
+                if let Some(beat) = old {
+                    cur.insert_beat(&mut self.song, true, beat.clone());
+                } else {
+                    cur.delete_beat(&mut self.song);
+                }
+                Ok("Undo paste beat".into())
+            }
+            Action::PasteBeats { cur, old, buf } => {
+                cur.delete_beats(&mut self.song, buf.len());
+                if let Some(beat) = old {
+                    cur.insert_beat(&mut self.song, false, beat.clone());
+                }
+                Ok("Undo paste beats".into())
             }
         }
     }
@@ -500,6 +535,39 @@ impl App {
         }
     }
 
+    fn paste_once(&mut self, in_place: bool) {
+        let res = match &self.copy_buf {
+            Buffer::Empty => Ok("".into()),
+            Buffer::Note(n) => self.push_action(Action::paste_note(
+                self.sel.clone(),
+                self.sel
+                    .beat(&self.song)
+                    .get_note(self.sel.string)
+                    .map(|n| n.to_owned()),
+                n.clone(),
+            )),
+            Buffer::Beat(b) => self.push_action(Action::paste_beat(
+                self.sel.clone(),
+                if in_place {
+                    Some(self.sel.beat(&self.song).clone())
+                } else {
+                    None
+                },
+                b.clone(),
+            )),
+            Buffer::Beats(b) => self.push_action(Action::paste_beats(
+                self.sel.clone(),
+                if in_place {
+                    Some(self.sel.beat(&self.song).clone())
+                } else {
+                    None
+                },
+                b.clone(),
+            )),
+        };
+        self.set_typing_res(res);
+    }
+
     // Raw event processors
 
     fn process_typing(&mut self) {
@@ -548,8 +616,8 @@ impl App {
                 KeyCode::Char('x') => self.typing = Typing::Delete(String::new()),
                 KeyCode::Char('l') => self.typing = Typing::Duration(String::new()),
                 KeyCode::Char('k') => self.typing = Typing::Clear(String::new()),
-                KeyCode::Char('v') => self.sel.paste_once(&mut self.song, &self.copy_buf, false),
-                KeyCode::Char('V') => self.sel.paste_once(&mut self.song, &self.copy_buf, true),
+                KeyCode::Char('v') => self.paste_once(false),
+                KeyCode::Char('V') => self.paste_once(true),
                 KeyCode::Char('z') => {
                     let res = self.undo();
                     self.set_typing_res(res);

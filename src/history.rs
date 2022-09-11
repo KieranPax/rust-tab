@@ -28,6 +28,21 @@ pub enum Action {
         cur: Cursor,
         old: Vec<Beat>,
     },
+    PasteNote {
+        cur: Cursor,
+        old: Option<Note>,
+        buf: Note,
+    },
+    PasteBeat {
+        cur: Cursor,
+        old: Option<Beat>,
+        buf: Beat,
+    },
+    PasteBeats {
+        cur: Cursor,
+        old: Option<Beat>,
+        buf: Vec<Beat>,
+    },
 }
 
 impl Action {
@@ -49,6 +64,18 @@ impl Action {
 
     pub fn delete_beats(cur: Cursor, old: Vec<Beat>) -> Self {
         Self::DeleteBeats { cur, old }
+    }
+
+    pub fn paste_note(cur: Cursor, old: Option<Note>, buf: Note) -> Self {
+        Self::PasteNote { cur, old, buf }
+    }
+
+    pub fn paste_beat(cur: Cursor, old: Option<Beat>, buf: Beat) -> Self {
+        Self::PasteBeat { cur, old, buf }
+    }
+
+    pub fn paste_beats(cur: Cursor, old: Option<Beat>, buf: Vec<Beat>) -> Self {
+        Self::PasteBeats { cur, old, buf }
     }
 }
 

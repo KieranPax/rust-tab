@@ -35,7 +35,7 @@ cl                      => Copy duration of beat at cursor
 
 v                       => Insert contents of buffer at cursor
 (shift)v                => Place contents of buffer at cursor 
---          (overwrite beat/measure) (only valid for cb/cm)
+--          (overwrite single beat/measure) (only valid for cb/cm)
 
 z                       => Undo (todo)
 Z                       => Redo (todo)

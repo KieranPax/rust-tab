@@ -136,10 +136,6 @@ impl Cursor {
         }
     }
 
-    pub fn insert_note(&self, song: &mut Song, fret: u16) {
-        self.beat_mut(song).set_note(self.string, fret);
-    }
-
     pub fn insert_beat(&self, song: &mut Song, in_place: bool, beat: Beat) {
         if in_place {
             self.beats_mut(song)[self.beat] = beat;
@@ -158,14 +154,5 @@ impl Cursor {
         dest.extend(src);
         dest.extend(after);
         self.track_mut(song).update_measures();
-    }
-
-    pub fn paste_once(&self, song: &mut Song, buf: &Buffer, in_place: bool) {
-        match buf {
-            Buffer::Empty => {}
-            Buffer::Note(n) => self.insert_note(song, n.fret),
-            Buffer::Beat(b) => self.insert_beat(song, in_place, b.clone()),
-            Buffer::Beats(b) => self.insert_beats(song, in_place, b.clone()),
-        }
     }
 }
