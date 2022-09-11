@@ -20,7 +20,6 @@ s                       => Move cursor down
     x = dead note (todo)
 
 n{v}[Enter|wasd|n]      => Write note at cursor
-{n}n{v}[Enter|wasd]     => Write the same note in n beats from cursor
 --  (Enter) will confirm the note
 --  (wasd) will confirm the note; move the cursor
 --  (n) will confirm the note; move the cursor forward; start editting next note

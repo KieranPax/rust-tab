@@ -70,6 +70,10 @@ impl Typing {
             self.count.pop();
         }
     }
+
+    fn parse_count(&self) -> Option<u32> {
+        self.count.parse().ok()
+    }
 }
 
 pub struct App {
