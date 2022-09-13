@@ -32,6 +32,7 @@ enum InpMode {
     Note,
     Edit,
     Duration,
+    Command,
 }
 
 struct InpCtrl {
@@ -72,6 +73,7 @@ impl InpCtrl {
             InpMode::Note => format!("n:{}", self.arg),
             InpMode::Edit => format!("e:{}", self.arg),
             InpMode::Duration => format!("d:{}", self.arg),
+            InpMode::Command => format!(":{}", self.arg),
         }
     }
 
@@ -80,6 +82,7 @@ impl InpCtrl {
             InpMode::Duration => ch.is_ascii_digit() || ch == &':' || ch == &'/',
             InpMode::Edit => ch.is_ascii_digit() || ch == &'x',
             InpMode::Note | InpMode::Beat | InpMode::Measure => ch.is_ascii_digit(),
+            InpMode::Command => ch.is_alphabetic() || ch == &'_' || ch == &' ',
             InpMode::None => false,
         }
     }
@@ -267,16 +270,17 @@ impl App {
         Ok(format!("Saved to {path}"))
     }
 
-    fn try_save_file(&mut self, inp: Option<&&str>) -> Result<String> {
-        if let Some(path) = inp {
-            self.save_file(path.to_string())
+    fn do_save_file(&mut self, inp: Option<String>) {
+        let res = if let Some(path) = inp {
+            self.save_file(path)
         } else {
             if let Some(path) = self.song_path.clone() {
                 self.save_file(path)
             } else {
-                Err(Error::MalformedCmd("No default file to save to".into()))
+                Err(Error::FileError("No default file to save to".into()))
             }
-        }
+        };
+        self.set_command_res(res);
     }
 
     fn load_file(&mut self, path: String) -> Result<String> {
@@ -288,16 +292,17 @@ impl App {
         }
     }
 
-    fn try_load_file(&mut self, inp: Option<&&str>) -> Result<String> {
-        if let Some(path) = inp {
+    fn do_load_file(&mut self, inp: Option<&&str>) {
+        let res = if let Some(path) = inp {
             self.load_file(path.to_string())
         } else {
             if let Some(path) = self.song_path.clone() {
                 self.load_file(path)
             } else {
-                Err(Error::MalformedCmd("No default file to save to".into()))
+                Err(Error::FileError("No default file to save to".into()))
             }
-        }
+        };
+        self.set_command_res(res);
     }
 
     // Drawing util functions
@@ -524,6 +529,7 @@ impl App {
             KeyCode::Char('n') => self.input.mode = InpMode::Note,
             KeyCode::Char('b') => self.input.mode = InpMode::Beat,
             KeyCode::Char('m') => self.input.mode = InpMode::Measure,
+            KeyCode::Char(':') => self.input.mode = InpMode::Command,
             _ => {}
         }
     }
@@ -542,6 +548,23 @@ impl App {
         match Note::parse(&self.input.arg) {
             Ok(note) => self.do_set_note(Some(note)),
             Err(e) => self.set_command_err(e),
+        }
+        self.input.clear();
+    }
+
+    fn input_command(&mut self) {
+        let cmd = if let Some((a, b)) = self.input.arg.split_once(' ') {
+            (a, Some(b))
+        } else {
+            (self.input.arg.as_str(), None)
+        };
+        match cmd {
+            ("save", Some(path)) => {
+                let path = Some(path.to_owned());
+                self.do_save_file(path);
+            }
+            ("save", None) => self.do_save_file(None),
+            _ => {}
         }
         self.input.clear();
     }
@@ -605,6 +628,10 @@ impl App {
                     }
                     _ => {}
                 },
+                InpMode::Command => match key {
+                    KeyCode::Enter => self.input_command(),
+                    _ => {}
+                },
                 _ => {}
             },
         }
@@ -641,7 +668,7 @@ impl App {
 
     pub fn run(mut self) -> Result<()> {
         self.song_path = self.args.path.clone();
-        let _ = self.try_load_file(None);
+        let _ = self.do_load_file(None);
 
         let mut win = window::Window::new()?;
         win.clear()?;
@@ -654,8 +681,6 @@ impl App {
             }
             do_redraw = self.proc_event(&mut win)?;
         }
-        win.clear()?.update()?;
-        self.try_save_file(None)?;
-        Ok(())
+        win.clear()?.update()
     }
 }

@@ -2,8 +2,7 @@
 pub enum Error {
     IOError(std::io::Error),
     NoEvent,
-    MalformedCmd(String),
-    UnknownCmd(String),
+    FileError(String),
     InvalidOp(String),
 }
 
@@ -12,8 +11,7 @@ impl std::fmt::Display for Error {
         match self {
             Self::IOError(arg0) => write!(f, "IOError({arg0:?})"),
             Self::NoEvent => write!(f, "NoEvent"),
-            Self::MalformedCmd(arg0) => write!(f, "MalformedCmd({arg0})"),
-            Self::UnknownCmd(arg0) => write!(f, "UnknownCmd({arg0})"),
+            Self::FileError(arg0) => write!(f, "FileError({arg0})"),
             Self::InvalidOp(arg0) => write!(f, "InvalidOp({arg0})"),
         }
     }
