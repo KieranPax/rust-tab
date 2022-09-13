@@ -69,7 +69,7 @@ impl InpCtrl {
 
     fn char_valid(&self, ch: char) -> bool {
         match self.mode {
-            InpMode::Duration => ch.is_ascii_digit() || ch == ':' || ch == '*',
+            InpMode::Duration => ch.is_ascii_digit() || ch == ':' || ch == '/',
             InpMode::Edit => ch.is_ascii_digit() || ch == 'x',
             InpMode::Note | InpMode::Beat | InpMode::Measure => ch.is_ascii_digit(),
             InpMode::None => false,

@@ -18,6 +18,14 @@ impl fmt::Debug for Duration {
     }
 }
 
+fn parse_match<T: std::str::FromStr>(opt: Option<regex::Match>) -> Option<T> {
+    if let Some(v) = opt {
+        v.as_str().parse::<T>().ok()
+    } else {
+        None
+    }
+}
+
 impl Duration {
     pub fn new(a: u8, b: u8) -> Self {
         Self(Fraction::new(a, b))
@@ -66,25 +74,29 @@ impl Duration {
         lazy_static::lazy_static! {
             static ref RE: Regex = Regex::new(r"^(?:(\d+)/|)(\d+)(\.|)(?::(\d+)|)$").unwrap();
         }
-        let caps = RE.captures(s).unwrap();
+        if let Some(caps) = RE.captures(s) {
+            let num = parse_match(caps.get(1));
+            let base = parse_match(caps.get(2));
+            let tuplet = parse_match(caps.get(4));
+            let dotted = caps.get(3).unwrap().range().len() > 0;
 
-        let num: Option<u8> = caps.get(1).map(|s| s.as_str().parse().unwrap());
-        let base: Option<u8> = caps.get(2).map(|s| s.as_str().parse().unwrap());
-        let dotted = caps.get(3).unwrap().range().len() > 0;
-        let tuplet: Option<u8> = caps.get(4).map(|s| s.as_str().parse().unwrap());
-
-        if let Some(base) = base {
-            let mut d = Duration::new(1, base);
-            if dotted {
-                d = d.dotted();
+            if let Some(base) = base {
+                let mut d = Duration::new(1, base);
+                if dotted {
+                    d = d.dotted();
+                }
+                if num.is_some() {
+                    d = d * num.unwrap();
+                }
+                if tuplet.is_some() {
+                    d = (d / tuplet.unwrap()) * 2;
+                }
+                Ok(d)
+            } else {
+                Err(Error::InvalidOp(format!(
+                    "Unable to parse '{s}' as Duration"
+                )))
             }
-            if num.is_some() {
-                d = d * num.unwrap();
-            }
-            if tuplet.is_some() {
-                d = (d / tuplet.unwrap()) * 2;
-            }
-            Ok(d)
         } else {
             Err(Error::InvalidOp(format!(
                 "Unable to parse '{s}' as Duration"
