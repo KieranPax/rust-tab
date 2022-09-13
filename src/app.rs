@@ -429,37 +429,34 @@ impl App {
     }
 
     fn key_input(&mut self, key: KeyCode) {
+        if matches!(key, KeyCode::Esc) {
+            return self.input.clear();
+        }
+        if let KeyCode::Char(ch) = key {
+            if self.input.char_valid(ch) {
+                return self.input.arg.push(ch);
+            }
+        }
         match self.input.mode {
             InpMode::Duration => match key {
-                KeyCode::Esc => self.input.clear(),
                 KeyCode::Enter => self.input_duration(),
                 KeyCode::Char('l') => {
                     self.input_duration();
                     self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
                     self.input.mode = InpMode::Duration;
                 }
-                KeyCode::Char(ch) if self.input.char_valid(ch) => {
-                    self.input.arg.push(ch);
-                }
                 _ => {}
             },
             InpMode::Edit => match key {
-                KeyCode::Esc => self.input.clear(),
                 KeyCode::Enter => self.input_edit(),
                 KeyCode::Char('e') => {
                     self.input_edit();
                     self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
                     self.input.mode = InpMode::Edit;
                 }
-                KeyCode::Char(ch) if self.input.char_valid(ch) => {
-                    self.input.arg.push(ch);
-                }
                 _ => {}
             },
-            _ => match key {
-                KeyCode::Esc => self.input.clear(),
-                _ => {}
-            },
+            _ => {}
         }
     }
 
