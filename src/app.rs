@@ -94,7 +94,7 @@ pub struct App {
     should_close: bool,
     song_path: Option<String>,
     song: Song,
-    sel: Cursor,
+    cur: Cursor,
     input: InpCtrl,
     command_res: String,
     copy_buf: Buffer,
@@ -110,7 +110,7 @@ impl App {
             should_close: false,
             song_path: None,
             song: Song::new(),
-            sel: Cursor::new(),
+            cur: Cursor::new(),
             input: InpCtrl::new(),
             command_res: String::new(),
             copy_buf: Buffer::Empty,
@@ -308,8 +308,8 @@ impl App {
     }
 
     fn visible_beat_range(&self) -> BeatRange {
-        let num_beats = self.sel.beats(&self.song).len();
-        self.sel.scroll..(self.sel.scroll + self.s_bwidth).min(num_beats)
+        let num_beats = self.cur.beats(&self.song).len();
+        self.cur.scroll..(self.cur.scroll + self.s_bwidth).min(num_beats)
     }
 
     fn gen_status_msg(&self) -> String {
@@ -335,7 +335,7 @@ impl App {
     // Draw functions
 
     fn draw_durations(&self, win: &mut window::Window, range: BeatRange) -> Result<()> {
-        let track = self.sel.track(&self.song);
+        let track = self.cur.track(&self.song);
         win.moveto(0, 0)?;
         for i in range {
             win.print("~")?.print(track.beats[i].dur.dur_icon())?;
@@ -345,7 +345,7 @@ impl App {
     }
 
     fn draw_string(&self, win: &mut window::Window, string: u16, range: BeatRange) -> Result<()> {
-        let track = self.sel.track(&self.song);
+        let track = self.cur.track(&self.song);
         win.moveto(0, string + 1)?;
         for i in range {
             win.print_styled(if track.is_measure_start(&i) {
@@ -359,8 +359,8 @@ impl App {
                 Some(Note::X) => " X ".into(),
                 None => "―――".into(),
             };
-            if self.sel.beat == i {
-                win.print_styled(if self.sel.string == string {
+            if self.cur.beat == i {
+                win.print_styled(if self.cur.string == string {
                     inner.as_str().on_white().black()
                 } else {
                     inner.as_str().on_grey().black()
@@ -375,7 +375,7 @@ impl App {
 
     fn draw(&self, win: &mut window::Window) -> Result<()> {
         let t0 = std::time::Instant::now();
-        let track = self.sel.track(&self.song);
+        let track = self.cur.track(&self.song);
         win.moveto(0, 0)?;
         let range = self.visible_beat_range();
         self.draw_durations(win, range.clone())?;
@@ -397,36 +397,36 @@ impl App {
 
     fn do_set_duration(&mut self, dur: Duration) {
         self.new_action(Action::set_duration(
-            self.sel.clone(),
-            self.sel.beat(&self.song).dur.clone(),
+            self.cur.clone(),
+            self.cur.beat(&self.song).dur.clone(),
             dur,
         ));
     }
 
     fn do_set_note(&mut self, note: Option<Note>) {
         self.new_action(Action::set_note(
-            self.sel.clone(),
-            self.sel.beat(&self.song).copy_note(self.sel.string),
+            self.cur.clone(),
+            self.cur.beat(&self.song).copy_note(self.cur.string),
             note,
         ));
     }
 
     fn do_copy_note(&mut self) {
-        self.copy_buf = self.sel.copy_note(&mut self.song);
+        self.copy_buf = self.cur.copy_note(&mut self.song);
         if matches!(self.copy_buf, Buffer::Note(_)) {
             self.set_command_res(Ok("Copied Note"));
         }
     }
 
     fn do_copy_beat(&mut self) {
-        self.copy_buf = self.sel.copy_beat(&mut self.song);
+        self.copy_buf = self.cur.copy_beat(&mut self.song);
         if matches!(self.copy_buf, Buffer::Beat(_)) {
             self.set_command_res(Ok("Copied Beat"));
         }
     }
 
     fn do_copy_beats(&mut self, count: usize) {
-        self.copy_buf = self.sel.copy_beats(&mut self.song, count);
+        self.copy_buf = self.cur.copy_beats(&mut self.song, count);
         if let Buffer::Beats(b) = &self.copy_buf {
             let msg = format!("Copied {} beats", b.len());
             self.set_command_res(Ok(msg));
@@ -434,8 +434,8 @@ impl App {
     }
 
     fn do_delete_beats(&mut self, count: usize) {
-        if let Some(b) = self.sel.clone_beats_slice(&self.song, count) {
-            self.new_action(Action::delete_beats(self.sel.clone(), b))
+        if let Some(b) = self.cur.clone_beats_slice(&self.song, count) {
+            self.new_action(Action::delete_beats(self.cur.clone(), b))
         } else {
             self.set_command_err(Error::InvalidOp("Tried to delete out of bounds".into()));
         }
@@ -443,14 +443,14 @@ impl App {
 
     fn do_delete_beat(&mut self) {
         self.new_action(Action::delete_beat(
-            self.sel.clone(),
-            self.sel.clone_beat(&self.song),
+            self.cur.clone(),
+            self.cur.clone_beat(&self.song),
         ));
     }
 
     fn do_clear_beats(&mut self, count: usize) {
-        if let Some(b) = self.sel.clone_beats_slice(&self.song, count) {
-            self.new_action(Action::clear_beats(self.sel.clone(), b))
+        if let Some(b) = self.cur.clone_beats_slice(&self.song, count) {
+            self.new_action(Action::clear_beats(self.cur.clone(), b))
         } else {
             self.set_command_err(Error::InvalidOp("Tried to delete out of bounds".into()));
         }
@@ -458,31 +458,31 @@ impl App {
 
     fn do_clear_beat(&mut self) {
         self.new_action(Action::clear_beat(
-            self.sel.clone(),
-            self.sel.clone_chord(&self.song),
+            self.cur.clone(),
+            self.cur.clone_chord(&self.song),
         ));
     }
 
     fn do_paste(&mut self, in_place: bool) {
         match self.copy_buf.clone() {
             Buffer::Note(note) => self.new_action(Action::paste_note(
-                self.sel.clone(),
-                self.sel.clone_note(&self.song),
+                self.cur.clone(),
+                self.cur.clone_note(&self.song),
                 note,
             )),
             Buffer::Beat(beat) => self.new_action(Action::paste_beat(
-                self.sel.clone(),
+                self.cur.clone(),
                 if in_place {
-                    Some(self.sel.clone_beat(&self.song))
+                    Some(self.cur.clone_beat(&self.song))
                 } else {
                     None
                 },
                 beat,
             )),
             Buffer::Beats(beats) => self.new_action(Action::paste_beats(
-                self.sel.clone(),
+                self.cur.clone(),
                 if in_place {
-                    Some(self.sel.clone_beat(&self.song))
+                    Some(self.cur.clone_beat(&self.song))
                 } else {
                     None
                 },
@@ -497,12 +497,12 @@ impl App {
     fn key_press(&mut self, key: KeyCode, modi: KeyModifiers) {
         match key {
             KeyCode::Esc => self.should_close = true,
-            KeyCode::Char('d') => self.sel.seek_beat(&mut self.song, 1, self.s_bwidth),
-            KeyCode::Char('a') => self.sel.seek_beat(&mut self.song, -1, self.s_bwidth),
-            KeyCode::Char('s') => self.sel.seek_string(&self.song, 1),
-            KeyCode::Char('w') => self.sel.seek_string(&self.song, -1),
-            KeyCode::Right => self.sel.seek_scroll(&mut self.song, 1, self.s_bwidth),
-            KeyCode::Left => self.sel.seek_scroll(&mut self.song, -1, self.s_bwidth),
+            KeyCode::Char('d') => self.cur.seek_beat(&mut self.song, 1, self.s_bwidth),
+            KeyCode::Char('a') => self.cur.seek_beat(&mut self.song, -1, self.s_bwidth),
+            KeyCode::Char('s') => self.cur.seek_string(&self.song, 1),
+            KeyCode::Char('w') => self.cur.seek_string(&self.song, -1),
+            KeyCode::Right => self.cur.seek_scroll(&mut self.song, 1, self.s_bwidth),
+            KeyCode::Left => self.cur.seek_scroll(&mut self.song, -1, self.s_bwidth),
 
             KeyCode::Char('z') => {
                 let res = self.undo();
@@ -556,7 +556,7 @@ impl App {
                     KeyCode::Enter => self.input_duration(),
                     KeyCode::Char('l') => {
                         self.input_duration();
-                        self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
+                        self.cur.seek_beat(&mut self.song, 1, self.s_bwidth);
                         self.input.mode = InpMode::Duration;
                     }
                     _ => {}
@@ -565,7 +565,7 @@ impl App {
                     KeyCode::Enter => self.input_edit(),
                     KeyCode::Char('e') => {
                         self.input_edit();
-                        self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
+                        self.cur.seek_beat(&mut self.song, 1, self.s_bwidth);
                         self.input.mode = InpMode::Edit;
                     }
                     _ => {}
@@ -647,7 +647,7 @@ impl App {
         win.clear()?;
         self.reset_sdim(crossterm::terminal::size().unwrap());
         let mut do_redraw = true;
-        self.sel.track_mut(&mut self.song).update_measures();
+        self.cur.track_mut(&mut self.song).update_measures();
         while !self.should_close {
             if do_redraw {
                 self.draw(&mut win)?;

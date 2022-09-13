@@ -44,12 +44,6 @@ impl Cursor {
             .get(self.beat..self.beat + count)
     }
 
-    pub fn beats_slice_mut<'a>(&self, song: &'a mut Song, count: usize) -> Option<&'a mut [Beat]> {
-        song.tracks[self.track]
-            .beats
-            .get_mut(self.beat..self.beat + count)
-    }
-
     pub fn beat<'a>(&self, song: &'a Song) -> &'a Beat {
         &song.tracks[self.track].beats[self.beat]
     }
