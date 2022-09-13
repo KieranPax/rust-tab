@@ -57,22 +57,14 @@ impl Cursor {
         self.string = new.clamp(0, self.track(song).string_count as i16 - 1) as u16;
     }
 
-    pub fn seek_beat(&mut self, song: &mut Song, dire: isize) {
+    pub fn seek_beat(&mut self, song: &mut Song, dire: isize, s_bwidth: usize) {
         let new = (self.beat as isize + dire).max(0) as usize;
         let beats = self.beats_mut(song);
         while new >= beats.len() as usize {
             beats.push(beats.last().unwrap().copy_duration());
         }
         self.beat = new;
-    }
-
-    pub fn seek_scroll(&mut self, song: &Song, dire: isize) {
-        let new = (self.scroll as isize + dire).max(0) as usize;
-        self.scroll = new.min(self.beats(song).len() - 1);
-    }
-
-    pub fn cursor_to_scroll(&mut self, s_bwidth: usize) {
-        self.beat = self.beat.clamp(self.scroll, self.scroll + s_bwidth - 1);
+        self.scroll_to_cursor(s_bwidth);
     }
 
     pub fn scroll_to_cursor(&mut self, s_bwidth: usize) {
@@ -82,6 +74,16 @@ impl Cursor {
         if self.scroll + s_bwidth - 1 < self.beat {
             self.scroll = self.beat - (s_bwidth - 1);
         }
+    }
+
+    pub fn seek_scroll(&mut self, song: &Song, dire: isize,  s_bwidth: usize) {
+        let new = (self.scroll as isize + dire).max(0) as usize;
+        self.scroll = new.min(self.beats(song).len() - 1);
+        self.cursor_to_scroll(s_bwidth);
+    }
+
+    pub fn cursor_to_scroll(&mut self, s_bwidth: usize) {
+        self.beat = self.beat.clamp(self.scroll, self.scroll + s_bwidth - 1);
     }
 
     pub fn set_duration(&self, song: &mut Song, dur: Duration) {

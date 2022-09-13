@@ -2,7 +2,7 @@ use crate::{
     buffer::Buffer,
     cursor::Cursor,
     dur::Duration,
-    error::{Error, Result, SResult},
+    error::{Error, Result},
     history::{Action, History},
     song::{Note, Song},
     window,
@@ -25,54 +25,46 @@ struct Args {
 
 type BeatRange = std::ops::Range<usize>;
 
-struct Typing {
-    count: String,
-    cmd: String,
+enum InpMode {
+    None,
+    Measure,
+    Beat,
+    Note,
+    Edit,
+    Duration,
 }
 
-impl Typing {
+struct InpCtrl {
+    mode: InpMode,
+    arg: String,
+}
+
+impl InpCtrl {
     fn new() -> Self {
         Self {
-            count: String::new(),
-            cmd: String::new(),
+            mode: InpMode::None,
+            arg: String::new(),
         }
-    }
-
-    fn is_recieving(&self) -> bool {
-        !(self.cmd.is_empty() && self.count.is_empty())
-    }
-
-    fn display(&self) -> String {
-        format!("{} {}", self.count, self.cmd)
     }
 
     fn clear(&mut self) {
-        self.count.clear();
-        self.cmd.clear();
+        self.mode = InpMode::None;
+        self.arg.clear();
     }
 
-    fn send_char(&mut self, c: char) {
-        if self.cmd.is_empty() {
-            if c.is_ascii_digit() {
-                self.count.push(c);
-            } else {
-                self.cmd.push(c);
-            }
-        } else {
-            self.cmd.push(c);
+    fn is_none(&self) -> bool {
+        matches!(self.mode, InpMode::None)
+    }
+
+    fn display(&self) -> String {
+        match &self.mode {
+            InpMode::None => self.arg.clone(),
+            InpMode::Measure => format!("m:{}", self.arg),
+            InpMode::Beat => format!("b:{}", self.arg),
+            InpMode::Note => format!("n:{}", self.arg),
+            InpMode::Edit => format!("e:{}", self.arg),
+            InpMode::Duration => format!("d:{}", self.arg),
         }
-    }
-
-    fn backspace(&mut self) {
-        if !self.cmd.is_empty() {
-            self.cmd.pop();
-        } else {
-            self.count.pop();
-        }
-    }
-
-    fn parse_count(&self) -> Option<usize> {
-        self.count.parse().ok()
     }
 }
 
@@ -82,8 +74,8 @@ pub struct App {
     song_path: Option<String>,
     song: Song,
     sel: Cursor,
-    typing: Typing,
-    typing_res: String,
+    input: InpCtrl,
+    command_res: String,
     copy_buf: Buffer,
     s_bwidth: usize,
     s_height: u16,
@@ -98,8 +90,8 @@ impl App {
             song_path: None,
             song: Song::new(),
             sel: Cursor::new(),
-            typing: Typing::new(),
-            typing_res: String::new(),
+            input: InpCtrl::new(),
+            command_res: String::new(),
             copy_buf: Buffer::Empty,
             s_bwidth: 4,
             s_height: 4,
@@ -232,6 +224,11 @@ impl App {
         res
     }
 
+    fn new_action(&mut self, action: Action) {
+        let res = self.push_action(action);
+        self.set_command_res(res);
+    }
+
     // IO functions
 
     fn save_file(&mut self, path: String) -> Result<String> {
@@ -287,23 +284,22 @@ impl App {
     }
 
     fn gen_status_msg(&self) -> String {
-        if self.typing.is_recieving() {
-            format!(">{}< | buffer : {:?}", self.typing.display(), self.copy_buf)
+        if self.input.is_none() {
+            format!("{} | buffer : {:?}", self.command_res, self.copy_buf)
         } else {
-            format!("{} | buffer : {:?}", self.typing_res, self.copy_buf)
+            format!(">{}< | buffer : {:?}", self.input.display(), self.copy_buf)
         }
     }
 
-    fn set_typing_res<T>(&mut self, res: Result<T>)
+    fn set_command_res<T>(&mut self, res: Result<T>)
     where
         T: Into<String>,
     {
         if let Err(e) = res {
-            self.typing_res = format!("{e}");
+            self.command_res = format!("{e}");
         } else {
-            self.typing_res = res.unwrap().into();
+            self.command_res = res.unwrap().into();
         }
-        self.typing.clear();
     }
 
     // Draw functions
@@ -367,273 +363,70 @@ impl App {
         Ok(())
     }
 
-    // Command processors
-
-    fn proc_t_command(&mut self, s_cmd: String) -> Result<String> {
-        let cmd: Vec<_> = s_cmd.split(' ').collect();
-        match cmd.get(0) {
-            Some(&"save") => self.try_save_file(cmd.get(1)),
-            Some(&"load") => self.try_load_file(cmd.get(1)),
-            _ => Err(Error::UnknownCmd(s_cmd)),
-        }
-    }
-
-    fn proc_t_copy(&mut self, cmd: String) -> Result<String> {
-        if cmd.len() == 0 {
-            Ok(String::new())
-        } else {
-            let (a, b) = cmd.split_at(cmd.len() - 1);
-            let a: SResult<usize, _> = a.parse();
-            match (a, b) {
-                (_, "n") => {
-                    self.copy_buf = self.sel.copy_note(&mut self.song, self.sel.string);
-                    match &self.copy_buf {
-                        Buffer::Note(_) => Ok("Note copied".into()),
-                        _ => Err(Error::InvalidOp("No note selected".into())),
-                    }
-                }
-                (Ok(count), "b") => {
-                    self.copy_buf = self.sel.copy_beats(&mut self.song, count);
-                    match &self.copy_buf {
-                        Buffer::Beats(_) => Ok(format!("{count} beats copied")),
-                        _ => Err(Error::InvalidOp("Copy range out of range".into())),
-                    }
-                }
-                (_, "b") => {
-                    self.copy_buf = self.sel.copy_beat(&mut self.song);
-                    Ok("Beat copied".into())
-                }
-                _ => Err(Error::MalformedCmd(format!("Unknown copy type ({b})"))),
-            }
-        }
-    }
-
-    fn push_paste_once(&mut self, in_place: bool) {
-        let res = match &self.copy_buf {
-            Buffer::Empty => Ok("".into()),
-            Buffer::Note(n) => self.push_action(Action::paste_note(
-                self.sel.clone(),
-                self.sel.beat(&self.song).copy_note(self.sel.string),
-                n.clone(),
-            )),
-            Buffer::Beat(b) => self.push_action(Action::paste_beat(
-                self.sel.clone(),
-                if in_place {
-                    Some(self.sel.beat(&self.song).clone())
-                } else {
-                    None
-                },
-                b.clone(),
-            )),
-            Buffer::Beats(b) => self.push_action(Action::paste_beats(
-                self.sel.clone(),
-                if in_place {
-                    Some(self.sel.beat(&self.song).clone())
-                } else {
-                    None
-                },
-                b.clone(),
-            )),
-        };
-        self.set_typing_res(res);
-    }
-
-    fn apply_note(&mut self, note_str: &str) {
-        if note_str.is_empty() {
-            return;
-        }
-        let note = Note::parse(note_str);
-        let res = match note {
-            Ok(note) => self.push_action(Action::set_note(
-                self.sel.clone(),
-                self.sel.beat(&self.song).copy_note(self.sel.string),
-                Some(note),
-            )),
-            Err(e) => Err(e),
-        };
-        self.set_typing_res(res);
-    }
-
-    fn check_typing(&mut self) {
-        let cmd = &self.typing.cmd;
-        if cmd.starts_with("l") {
-            return;
-        }
-        if cmd.len() > 1 && cmd.starts_with("n") {
-            let last = cmd.chars().last().unwrap();
-            if !(last.is_ascii_digit() || last == 'x') {
-                let s = cmd.get(1..cmd.len() - 1).unwrap().to_owned();
-                self.apply_note(&s);
-                self.typing.clear();
-                match last {
-                    'n' => {
-                        self.sel.seek_beat(&mut self.song, 1);
-                        self.typing.send_char('n');
-                    }
-                    'd' => self.sel.seek_beat(&mut self.song, 1),
-                    'a' => self.sel.seek_beat(&mut self.song, -1),
-                    's' => self.sel.seek_string(&self.song, 1),
-                    'w' => self.sel.seek_string(&self.song, -1),
-                    _ => {}
-                }
-            }
-            return;
-        }
-        if !cmd.starts_with(':') {
-            match cmd.as_str() {
-                "k" | "c" | "x" | "n" | "" => {}
-                "z" => {
-                    let res = self.undo();
-                    self.set_typing_res(res);
-                }
-                "Z" => {
-                    let res = self.redo();
-                    self.set_typing_res(res);
-                }
-                "v" => self.push_paste_once(true),
-                "V" => self.push_paste_once(false),
-                "q" => self.should_close = true,
-                "kb" => {
-                    let res = self.push_action(Action::clear_beat(
-                        self.sel.clone(),
-                        self.sel.beat(&self.song).notes.clone(),
-                    ));
-                    self.set_typing_res(res);
-                }
-                "kn" | "xn" => {
-                    let res = self.push_action(Action::set_note(
-                        self.sel.clone(),
-                        self.sel.beat(&self.song).copy_note(self.sel.string),
-                        None,
-                    ));
-                    self.set_typing_res(res);
-                }
-                "xb" => {
-                    let res = if let Some(count) = self.typing.parse_count() {
-                        if let Some(b) = self.sel.beats_slice(&self.song, count) {
-                            self.push_action(Action::delete_beats(self.sel.clone(), b.to_owned()))
-                        } else {
-                            Err(Error::InvalidOp("Tried to delete out of bounds".into()))
-                        }
-                    } else {
-                        self.push_action(Action::delete_beat(
-                            self.sel.clone(),
-                            self.sel.beat(&self.song).clone(),
-                        ))
-                    };
-                    self.set_typing_res(res);
-                }
-                "i" => {
-                    let beat = self.sel.beat(&self.song).copy_duration();
-                    let res = if let Some(count) = self.typing.parse_count() {
-                        self.push_action(Action::paste_beats(
-                            self.sel.clone(),
-                            None,
-                            vec![beat.clone(); count],
-                        ))
-                    } else {
-                        self.push_action(Action::paste_beat(self.sel.clone(), None, beat))
-                    };
-                    self.set_typing_res(res);
-                }
-                _ => self.typing.clear(),
-            }
-        }
-    }
-
-    fn confirm_typing(&mut self) {
-        if self.typing.cmd.starts_with(':') {
-            let cmd = self.typing.cmd.get(1..).unwrap().to_owned();
-            let res = self.proc_t_command(cmd);
-            self.set_typing_res(res);
-        } else if self.typing.cmd.starts_with('n') {
-            let s = self.typing.cmd.get(1..).unwrap().to_owned();
-            self.apply_note(&s);
-            self.typing.clear();
-        } else if self.typing.cmd.starts_with('l') {
-            let s = self.typing.cmd.get(1..).unwrap();
-            let res = match Duration::parse(s) {
-                Ok(dur) => self.push_action(Action::set_duration(
-                    self.sel.clone(),
-                    self.sel.beat(&self.song).dur,
-                    dur,
-                )),
-                Err(e) => Err(e),
-            };
-            self.set_typing_res(res);
-            self.typing.clear();
-        } else {
-            self.set_typing_res(Ok(""));
-        }
-        self.typing.clear();
-    }
-
-    // Raw event processors
+    // Input handling
 
     fn key_press(&mut self, key: KeyCode, modi: KeyModifiers) {
-        if self.typing.is_recieving() {
-            if let KeyCode::Char(c) = key {
-                self.typing.send_char(c);
-                self.check_typing();
-                return;
-            }
-            if let KeyCode::Backspace = key {
-                self.typing.backspace();
-                self.check_typing();
-                return;
-            }
-        }
         match key {
-            // Combo
-            KeyCode::Esc => {
-                if self.typing.is_recieving() {
-                    self.typing.clear();
-                } else {
-                    self.should_close = true;
-                }
+            KeyCode::Esc => self.should_close = true,
+            KeyCode::Char('d') => self.sel.seek_beat(&mut self.song, 1, self.s_bwidth),
+            KeyCode::Char('a') => self.sel.seek_beat(&mut self.song, -1, self.s_bwidth),
+            KeyCode::Char('s') => self.sel.seek_string(&self.song, 1),
+            KeyCode::Char('w') => self.sel.seek_string(&self.song, -1),
+            KeyCode::Right => self.sel.seek_scroll(&mut self.song, 1, self.s_bwidth),
+            KeyCode::Left => self.sel.seek_scroll(&mut self.song, -1, self.s_bwidth),
+
+            KeyCode::Char('z') => {
+                let res = self.undo();
+                self.set_command_res(res);
             }
-            KeyCode::Enter => self.confirm_typing(),
-            // Cursor movement and scroll
-            KeyCode::Right => {
-                if modi.contains(KeyModifiers::SHIFT) {
-                    self.sel.seek_scroll(&self.song, 5)
-                } else {
-                    self.sel.seek_scroll(&self.song, 1)
-                }
-                self.sel.cursor_to_scroll(self.s_bwidth);
+            KeyCode::Char('y') => {
+                let res = self.redo();
+                self.set_command_res(res);
             }
-            KeyCode::Left => {
-                if modi.contains(KeyModifiers::SHIFT) {
-                    self.sel.seek_scroll(&self.song, -5)
-                } else {
-                    self.sel.seek_scroll(&self.song, -1)
-                }
-                self.sel.cursor_to_scroll(self.s_bwidth);
-            }
-            KeyCode::Char('d') => {
-                self.sel.seek_beat(&mut self.song, 1);
-                self.sel.scroll_to_cursor(self.s_bwidth);
-            }
-            KeyCode::Char('a') => {
-                self.sel.seek_beat(&mut self.song, -1);
-                self.sel.scroll_to_cursor(self.s_bwidth);
-            }
-            KeyCode::Char('D') => {
-                self.sel.seek_beat(&mut self.song, 5);
-                self.sel.scroll_to_cursor(self.s_bwidth);
-            }
-            KeyCode::Char('A') => {
-                self.sel.seek_beat(&mut self.song, -5);
-                self.sel.scroll_to_cursor(self.s_bwidth);
-            }
-            KeyCode::Char('s') => self.sel.seek_string(&mut self.song, 1),
-            KeyCode::Char('w') => self.sel.seek_string(&mut self.song, -1),
-            // Start combo
-            KeyCode::Char(c) => {
-                self.typing.send_char(c);
-                self.check_typing();
-            }
+
+            KeyCode::Char('l') => self.input.mode = InpMode::Duration,
+            KeyCode::Char('e') => self.input.mode = InpMode::Edit,
+            KeyCode::Char('n') => self.input.mode = InpMode::Note,
+            KeyCode::Char('b') => self.input.mode = InpMode::Beat,
+            KeyCode::Char('m') => self.input.mode = InpMode::Measure,
             _ => {}
+        }
+    }
+
+    fn input_duration(&mut self) {
+        if !self.input.arg.is_empty() {
+            match Duration::parse(&self.input.arg) {
+                Ok(dur) => self.new_action(Action::set_duration(
+                    self.sel.clone(),
+                    self.sel.beat(&self.song).dur.clone(),
+                    dur,
+                )),
+                Err(e) => self.set_command_res::<&str>(Err(e)),
+            };
+            self.input.clear();
+        }
+    }
+
+    fn key_input(&mut self, key: KeyCode) {
+        match self.input.mode {
+            InpMode::Duration => match key {
+                KeyCode::Esc => self.input.clear(),
+                KeyCode::Enter => self.input_duration(),
+                KeyCode::Char(ch) => {
+                    if ch == 'l' {
+                        self.input_duration();
+                        self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
+                        self.input.mode = InpMode::Duration;
+                    } else if ch.is_ascii_digit() || ch == ':' || ch == '*' {
+                        self.input.arg.push(ch);
+                    }
+                }
+                _ => {}
+            },
+            _ => match key {
+                KeyCode::Esc => self.input.clear(),
+                _ => {}
+            },
         }
     }
 
@@ -644,7 +437,11 @@ impl App {
                     event::KeyEvent {
                         code, modifiers, ..
                     } => {
-                        self.key_press(code, modifiers);
+                        if self.input.is_none() {
+                            self.key_press(code, modifiers);
+                        } else {
+                            self.key_input(code);
+                        }
                         Ok(true)
                     }
                 },
