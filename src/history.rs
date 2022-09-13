@@ -20,6 +20,10 @@ pub enum Action {
         cur: Cursor,
         old: Vec<(u16, Note)>,
     },
+    ClearBeats {
+        cur: Cursor,
+        old: Vec<Beat>,
+    },
     DeleteBeat {
         cur: Cursor,
         old: Beat,
@@ -56,6 +60,10 @@ impl Action {
 
     pub fn clear_beat(cur: Cursor, old: Vec<(u16, Note)>) -> Self {
         Self::ClearBeat { cur, old }
+    }
+
+    pub fn clear_beats(cur: Cursor, old: Vec<Beat>) -> Self {
+        Self::ClearBeats { cur, old }
     }
 
     pub fn delete_beat(cur: Cursor, old: Beat) -> Self {

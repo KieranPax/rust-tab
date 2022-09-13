@@ -157,6 +157,10 @@ impl App {
                 cur.clear_beat(&mut self.song);
                 Ok("Clear beat".into())
             }
+            Action::ClearBeats { cur, old } => {
+                cur.clear_beats(&mut self.song, old.len());
+                Ok("Clear beats".into())
+            }
             Action::DeleteBeat { cur, .. } => {
                 cur.delete_beat(&mut self.song);
                 Ok("Delete beat".into())
@@ -201,6 +205,10 @@ impl App {
             Action::ClearBeat { cur, old } => {
                 cur.set_notes(&mut self.song, old.clone());
                 Ok("Undo clear beat".into())
+            }
+            Action::ClearBeats { cur, old } => {
+                cur.replace_beats(&mut self.song, old.clone());
+                Ok("Undo clear beats".into())
             }
             Action::DeleteBeat { cur, old } => {
                 cur.insert_beat(&mut self.song, false, old.clone());
@@ -455,6 +463,7 @@ impl App {
                     }
                     _ => {}
                 },
+
                 InpMode::Edit => match key {
                     KeyCode::Enter => self.input_edit(),
                     KeyCode::Char('e') => {
@@ -464,6 +473,7 @@ impl App {
                     }
                     _ => {}
                 },
+
                 InpMode::Note => match key {
                     KeyCode::Char('c') => {
                         self.copy_buf = self.sel.copy_note(&mut self.song);
@@ -479,6 +489,54 @@ impl App {
                     }
                     _ => {}
                 },
+
+                InpMode::Beat => match key {
+                    KeyCode::Char('c') => {
+                        match self.input.parse_arg() {
+                            Some(n) => self.copy_buf = self.sel.copy_beats(&mut self.song, n),
+                            None => self.copy_buf = self.sel.copy_beat(&mut self.song),
+                        }
+                        self.input.clear();
+                    }
+                    KeyCode::Char('x') => {
+                        match self.input.parse_arg() {
+                            Some(n) => {
+                                if let Some(b) = self.sel.clone_beats_slice(&self.song, n) {
+                                    self.new_action(Action::delete_beats(self.sel.clone(), b))
+                                } else {
+                                    self.set_command_res::<&str>(Err(Error::InvalidOp(
+                                        "Tried to delete out of bounds".into(),
+                                    )));
+                                }
+                            }
+                            None => self.new_action(Action::delete_beat(
+                                self.sel.clone(),
+                                self.sel.clone_beat(&self.song),
+                            )),
+                        }
+                        self.input.clear();
+                    }
+                    KeyCode::Char('k') => {
+                        match self.input.parse_arg::<usize>() {
+                            Some(n) => {
+                                if let Some(b) = self.sel.clone_beats_slice(&self.song, n) {
+                                    self.new_action(Action::clear_beats(self.sel.clone(), b))
+                                } else {
+                                    self.set_command_res::<&str>(Err(Error::InvalidOp(
+                                        "Tried to delete out of bounds".into(),
+                                    )));
+                                }
+                            }
+                            None => self.new_action(Action::clear_beat(
+                                self.sel.clone(),
+                                self.sel.clone_chord(&self.song),
+                            )),
+                        }
+                        self.input.clear();
+                    }
+                    _ => {}
+                },
+
                 _ => {}
             },
         }

@@ -44,12 +44,33 @@ impl Cursor {
             .get(self.beat..self.beat + count)
     }
 
+    pub fn beats_slice_mut<'a>(&self, song: &'a mut Song, count: usize) -> Option<&'a mut [Beat]> {
+        song.tracks[self.track]
+            .beats
+            .get_mut(self.beat..self.beat + count)
+    }
+
     pub fn beat<'a>(&self, song: &'a Song) -> &'a Beat {
         &song.tracks[self.track].beats[self.beat]
     }
 
     pub fn beat_mut<'a>(&self, song: &'a mut Song) -> &'a mut Beat {
         &mut song.tracks[self.track].beats[self.beat]
+    }
+
+    pub fn clone_beats_slice<'a>(&self, song: &'a Song, count: usize) -> Option<Vec<Beat>> {
+        song.tracks[self.track]
+            .beats
+            .get(self.beat..self.beat + count)
+            .map(|b| b.to_owned())
+    }
+
+    pub fn clone_beat(&self, song: &Song) -> Beat {
+        song.tracks[self.track].beats[self.beat].clone()
+    }
+
+    pub fn clone_chord(&self, song: &Song) -> Vec<(u16, Note)> {
+        song.tracks[self.track].beats[self.beat].notes.clone()
     }
 
     pub fn clone_note(&self, song: &Song) -> Option<Note> {
@@ -111,6 +132,12 @@ impl Cursor {
         self.beat_mut(song).notes.clear();
     }
 
+    pub fn clear_beats(&self, song: &mut Song, count: usize) {
+        for i in self.beat..self.beat + count {
+            self.track_mut(song).beats[i].notes.clear();
+        }
+    }
+
     pub fn delete_beat(&self, song: &mut Song) {
         self.beats_mut(song).remove(self.beat);
         self.track_mut(song).update_measures();
@@ -122,7 +149,7 @@ impl Cursor {
         self.track_mut(song).update_measures();
     }
 
-    pub fn copy_note(&self, song: &mut Song) -> Buffer {
+    pub fn copy_note(&self, song: &Song) -> Buffer {
         if let Some(note) = self.beat(song).copy_note(self.string) {
             Buffer::Note(note)
         } else {
@@ -130,11 +157,11 @@ impl Cursor {
         }
     }
 
-    pub fn copy_beat(&self, song: &mut Song) -> Buffer {
+    pub fn copy_beat(&self, song: &Song) -> Buffer {
         Buffer::Beat(self.beat(song).clone())
     }
 
-    pub fn copy_beats(&self, song: &mut Song, count: usize) -> Buffer {
+    pub fn copy_beats(&self, song: &Song, count: usize) -> Buffer {
         if let Some(beats) = self.beats_slice(song, count) {
             Buffer::Beats(beats.to_owned())
         } else {
@@ -159,6 +186,12 @@ impl Cursor {
         let after = dest.split_off(self.beat);
         dest.extend(src);
         dest.extend(after);
+        self.track_mut(song).update_measures();
+    }
+
+    pub fn replace_beats(&self, song: &mut Song, src: Vec<Beat>) {
+        self.beats_mut(song)
+            .splice(self.beat..self.beat + src.len(), src);
         self.track_mut(song).update_measures();
     }
 }
