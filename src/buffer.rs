@@ -1,6 +1,7 @@
 use crate::song::{Beat, Note};
 use std::fmt;
 
+#[derive(Clone)]
 pub enum Buffer {
     Empty,
     Note(Note),

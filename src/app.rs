@@ -320,15 +320,16 @@ impl App {
         }
     }
 
-    fn set_command_res<T>(&mut self, res: Result<T>)
-    where
-        T: Into<String>,
-    {
+    fn set_command_res<T: Into<String>>(&mut self, res: Result<T>) {
         if let Err(e) = res {
             self.command_res = format!("{e}");
         } else {
             self.command_res = res.unwrap().into();
         }
+    }
+
+    fn set_command_err(&mut self, err: Error) {
+        self.command_res = format!("{err}");
     }
 
     // Draw functions
@@ -436,9 +437,7 @@ impl App {
         if let Some(b) = self.sel.clone_beats_slice(&self.song, count) {
             self.new_action(Action::delete_beats(self.sel.clone(), b))
         } else {
-            self.set_command_res::<&str>(Err(Error::InvalidOp(
-                "Tried to delete out of bounds".into(),
-            )));
+            self.set_command_err(Error::InvalidOp("Tried to delete out of bounds".into()));
         }
     }
 
@@ -453,9 +452,7 @@ impl App {
         if let Some(b) = self.sel.clone_beats_slice(&self.song, count) {
             self.new_action(Action::clear_beats(self.sel.clone(), b))
         } else {
-            self.set_command_res::<&str>(Err(Error::InvalidOp(
-                "Tried to delete out of bounds".into(),
-            )));
+            self.set_command_err(Error::InvalidOp("Tried to delete out of bounds".into()));
         }
     }
 
@@ -464,6 +461,35 @@ impl App {
             self.sel.clone(),
             self.sel.clone_chord(&self.song),
         ));
+    }
+
+    fn do_paste(&mut self, in_place: bool) {
+        match self.copy_buf.clone() {
+            Buffer::Note(note) => self.new_action(Action::paste_note(
+                self.sel.clone(),
+                self.sel.clone_note(&self.song),
+                note,
+            )),
+            Buffer::Beat(beat) => self.new_action(Action::paste_beat(
+                self.sel.clone(),
+                if in_place {
+                    Some(self.sel.clone_beat(&self.song))
+                } else {
+                    None
+                },
+                beat,
+            )),
+            Buffer::Beats(beats) => self.new_action(Action::paste_beats(
+                self.sel.clone(),
+                if in_place {
+                    Some(self.sel.clone_beat(&self.song))
+                } else {
+                    None
+                },
+                beats,
+            )),
+            _ => {}
+        }
     }
 
     // Input handling
@@ -487,6 +513,12 @@ impl App {
                 self.set_command_res(res);
             }
 
+            KeyCode::Char('v') => self.do_paste(false),
+            KeyCode::Char('V') => self.do_paste(false),
+            KeyCode::Char('c') => {
+                self.set_command_err(Error::InvalidOp("Specify copy type first".into()))
+            }
+
             KeyCode::Char('l') => self.input.mode = InpMode::Duration,
             KeyCode::Char('e') => self.input.mode = InpMode::Edit,
             KeyCode::Char('n') => self.input.mode = InpMode::Note,
@@ -500,7 +532,7 @@ impl App {
         if !self.input.arg.is_empty() {
             match Duration::parse(&self.input.arg) {
                 Ok(dur) => self.do_set_duration(dur),
-                Err(e) => self.set_command_res::<&str>(Err(e)),
+                Err(e) => self.set_command_err(e),
             };
             self.input.clear();
         }
@@ -509,7 +541,7 @@ impl App {
     fn input_edit(&mut self) {
         match Note::parse(&self.input.arg) {
             Ok(note) => self.do_set_note(Some(note)),
-            Err(e) => self.set_command_res::<&str>(Err(e)),
+            Err(e) => self.set_command_err(e),
         }
         self.input.clear();
     }
