@@ -52,6 +52,14 @@ impl InpCtrl {
         self.arg.clear();
     }
 
+    fn backspace(&mut self) {
+        if self.arg.is_empty() {
+            self.mode = InpMode::None;
+        } else {
+            self.arg.pop();
+        }
+    }
+
     fn is_none(&self) -> bool {
         matches!(self.mode, InpMode::None)
     }
@@ -67,13 +75,17 @@ impl InpCtrl {
         }
     }
 
-    fn char_valid(&self, ch: char) -> bool {
+    fn char_valid(&self, ch: &char) -> bool {
         match self.mode {
-            InpMode::Duration => ch.is_ascii_digit() || ch == ':' || ch == '/',
-            InpMode::Edit => ch.is_ascii_digit() || ch == 'x',
+            InpMode::Duration => ch.is_ascii_digit() || ch == &':' || ch == &'/',
+            InpMode::Edit => ch.is_ascii_digit() || ch == &'x',
             InpMode::Note | InpMode::Beat | InpMode::Measure => ch.is_ascii_digit(),
             InpMode::None => false,
         }
+    }
+
+    fn parse_arg<T: std::str::FromStr>(&self) -> Option<T> {
+        self.arg.parse().ok()
     }
 }
 
@@ -429,43 +441,46 @@ impl App {
     }
 
     fn key_input(&mut self, key: KeyCode) {
-        if matches!(key, KeyCode::Esc) {
-            return self.input.clear();
-        }
-        if let KeyCode::Char(ch) = key {
-            if self.input.char_valid(ch) {
-                return self.input.arg.push(ch);
-            }
-        }
-        match self.input.mode {
-            InpMode::Duration => match key {
-                KeyCode::Enter => self.input_duration(),
-                KeyCode::Char('l') => {
-                    self.input_duration();
-                    self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
-                    self.input.mode = InpMode::Duration;
-                }
+        match &key {
+            KeyCode::Esc => self.input.clear(),
+            KeyCode::Backspace => self.input.backspace(),
+            KeyCode::Char(ch) if self.input.char_valid(ch) => self.input.arg.push(ch.to_owned()),
+            _ => match self.input.mode {
+                InpMode::Duration => match key {
+                    KeyCode::Enter => self.input_duration(),
+                    KeyCode::Char('l') => {
+                        self.input_duration();
+                        self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
+                        self.input.mode = InpMode::Duration;
+                    }
+                    _ => {}
+                },
+                InpMode::Edit => match key {
+                    KeyCode::Enter => self.input_edit(),
+                    KeyCode::Char('e') => {
+                        self.input_edit();
+                        self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
+                        self.input.mode = InpMode::Edit;
+                    }
+                    _ => {}
+                },
+                InpMode::Note => match key {
+                    KeyCode::Char('c') => {
+                        self.copy_buf = self.sel.copy_note(&mut self.song);
+                        self.input.clear();
+                    }
+                    KeyCode::Char('k') | KeyCode::Char('x') => {
+                        self.new_action(Action::set_note(
+                            self.sel.clone(),
+                            self.sel.clone_note(&self.song),
+                            None,
+                        ));
+                        self.input.clear();
+                    }
+                    _ => {}
+                },
                 _ => {}
             },
-            InpMode::Edit => match key {
-                KeyCode::Enter => self.input_edit(),
-                KeyCode::Char('e') => {
-                    self.input_edit();
-                    self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
-                    self.input.mode = InpMode::Edit;
-                }
-                _ => {}
-            },
-            InpMode::Note => match key {
-                KeyCode::Char('c') => self.copy_buf = self.sel.copy_note(&mut self.song),
-                KeyCode::Char('k') | KeyCode::Char('x') => self.new_action(Action::set_note(
-                    self.sel.clone(),
-                    self.sel.clone_note(&self.song),
-                    None,
-                )),
-                _ => {}
-            },
-            _ => {}
         }
     }
 
