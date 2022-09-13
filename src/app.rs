@@ -416,6 +416,18 @@ impl App {
         }
     }
 
+    fn input_edit(&mut self) {
+        match Note::parse(&self.input.arg) {
+            Ok(note) => self.new_action(Action::set_note(
+                self.sel.clone(),
+                self.sel.beat(&self.song).copy_note(self.sel.string),
+                Some(note),
+            )),
+            Err(e) => self.set_command_res::<&str>(Err(e)),
+        }
+        self.input.clear();
+    }
+
     fn key_input(&mut self, key: KeyCode) {
         match self.input.mode {
             InpMode::Duration => match key {
@@ -425,6 +437,19 @@ impl App {
                     self.input_duration();
                     self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
                     self.input.mode = InpMode::Duration;
+                }
+                KeyCode::Char(ch) if self.input.char_valid(ch) => {
+                    self.input.arg.push(ch);
+                }
+                _ => {}
+            },
+            InpMode::Edit => match key {
+                KeyCode::Esc => self.input.clear(),
+                KeyCode::Enter => self.input_edit(),
+                KeyCode::Char('e') => {
+                    self.input_edit();
+                    self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
+                    self.input.mode = InpMode::Edit;
                 }
                 KeyCode::Char(ch) if self.input.char_valid(ch) => {
                     self.input.arg.push(ch);
