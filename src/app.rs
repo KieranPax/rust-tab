@@ -456,6 +456,15 @@ impl App {
                 }
                 _ => {}
             },
+            InpMode::Note => match key {
+                KeyCode::Char('c') => self.copy_buf = self.sel.copy_note(&mut self.song),
+                KeyCode::Char('k') | KeyCode::Char('x') => self.new_action(Action::set_note(
+                    self.sel.clone(),
+                    self.sel.clone_note(&self.song),
+                    None,
+                )),
+                _ => {}
+            },
             _ => {}
         }
     }

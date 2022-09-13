@@ -52,6 +52,10 @@ impl Cursor {
         &mut song.tracks[self.track].beats[self.beat]
     }
 
+    pub fn clone_note(&self, song: &Song) -> Option<Note> {
+        song.tracks[self.track].beats[self.beat].copy_note(self.string)
+    }
+
     pub fn seek_string(&mut self, song: &Song, dire: i16) {
         let new = self.string as i16 + dire;
         self.string = new.clamp(0, self.track(song).string_count as i16 - 1) as u16;
@@ -76,7 +80,7 @@ impl Cursor {
         }
     }
 
-    pub fn seek_scroll(&mut self, song: &Song, dire: isize,  s_bwidth: usize) {
+    pub fn seek_scroll(&mut self, song: &Song, dire: isize, s_bwidth: usize) {
         let new = (self.scroll as isize + dire).max(0) as usize;
         self.scroll = new.min(self.beats(song).len() - 1);
         self.cursor_to_scroll(s_bwidth);
@@ -118,9 +122,9 @@ impl Cursor {
         self.track_mut(song).update_measures();
     }
 
-    pub fn copy_note(&self, song: &mut Song, string: u16) -> Buffer {
-        if let Some(note) = self.beat(song).get_note(string) {
-            Buffer::Note(note.clone())
+    pub fn copy_note(&self, song: &mut Song) -> Buffer {
+        if let Some(note) = self.beat(song).copy_note(self.string) {
+            Buffer::Note(note)
         } else {
             Buffer::Empty
         }
