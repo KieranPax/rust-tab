@@ -15,9 +15,8 @@ s                       => Move cursor down
 (Home)                  => Move cursor back 1 section
 (End)                   => Move cursor forward 1 section
 
-e[{n}|x][Enter|wasd|e]      => Write note at cursor
+e[{n}|x][Enter|e]      => Write note at cursor
 --  (Enter) will confirm the note
---  (wasd) will confirm the note; move the cursor
 --  (e) will confirm the note; move the cursor forward; start editting next note
 --  ie e0e1e2d will result in :  - 0 - 1 - 2 -[ ]-
 
@@ -57,8 +56,8 @@ m{n}i                   => Insert n measures at cursor
     {n}. = 1.5/{n}       -- 3*8 == 4.
     {dur}:{n} = {dur}/{n}
 
-l{dur}(Enter)           => Set duration of beat at cursor
-{n}l{dur}(Enter)        => Set duration of n beats from cursor
+l{dur}[Enter|l]           => Set duration of beat at cursor
+{n}l{dur}[Enter]        => Set duration of n beats from cursor
 
 :load {path}(Enter)     => Load song from {path} (and set as default location)
 :save(Enter)            => Save song into default location

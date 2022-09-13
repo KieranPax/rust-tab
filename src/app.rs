@@ -66,6 +66,15 @@ impl InpCtrl {
             InpMode::Duration => format!("d:{}", self.arg),
         }
     }
+
+    fn char_valid(&self, ch: char) -> bool {
+        match self.mode {
+            InpMode::Duration => ch.is_ascii_digit() || ch == ':' || ch == '*',
+            InpMode::Edit => ch.is_ascii_digit() || ch == 'x',
+            InpMode::Note | InpMode::Beat | InpMode::Measure => ch.is_ascii_digit(),
+            InpMode::None => false,
+        }
+    }
 }
 
 pub struct App {
@@ -412,14 +421,13 @@ impl App {
             InpMode::Duration => match key {
                 KeyCode::Esc => self.input.clear(),
                 KeyCode::Enter => self.input_duration(),
-                KeyCode::Char(ch) => {
-                    if ch == 'l' {
-                        self.input_duration();
-                        self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
-                        self.input.mode = InpMode::Duration;
-                    } else if ch.is_ascii_digit() || ch == ':' || ch == '*' {
-                        self.input.arg.push(ch);
-                    }
+                KeyCode::Char('l') => {
+                    self.input_duration();
+                    self.sel.seek_beat(&mut self.song, 1, self.s_bwidth);
+                    self.input.mode = InpMode::Duration;
+                }
+                KeyCode::Char(ch) if self.input.char_valid(ch) => {
+                    self.input.arg.push(ch);
                 }
                 _ => {}
             },
