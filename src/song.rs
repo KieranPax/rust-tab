@@ -84,7 +84,7 @@ pub struct Track {
     pub string_count: u16,
     pub beats: Vec<Beat>,
     #[serde(skip)]
-    pub measure_i: Vec<usize>,
+    pub measure_i: Vec<bool>,
 }
 
 impl Track {
@@ -97,23 +97,22 @@ impl Track {
     }
 
     pub fn update_measures(&mut self) {
-        let mut v = Vec::new();
+        self.measure_i.clear();
+        self.measure_i.reserve(self.beats.len());
         let mut total = Duration::new(1, 1);
         let mlen = Duration::new(1, 1);
-        for (i, beat) in self.beats.iter().enumerate() {
+        for beat in self.beats.iter() {
             if total == mlen {
-                v.push(i);
                 total = Duration::new(0, 1);
+                self.measure_i.push(true);
             } else if total > mlen {
                 total = total - mlen;
+                self.measure_i.push(false);
+            } else {
+                self.measure_i.push(false);
             }
             total = total + beat.dur;
         }
-        self.measure_i = v;
-    }
-
-    pub fn is_measure_start(&self, bindex: &usize) -> bool {
-        self.measure_i.contains(bindex)
     }
 }
 

@@ -353,7 +353,7 @@ impl App {
         let track = self.cur.track(&self.song);
         win.moveto(0, string + 1)?;
         for i in range {
-            win.print_styled(if track.is_measure_start(&i) {
+            win.print_styled(if track.measure_i[i] {
                 "|".white()
             } else {
                 "―".grey()
@@ -500,14 +500,24 @@ impl App {
     // Input handling
 
     fn key_press(&mut self, key: KeyCode, modi: KeyModifiers) {
+        let shift = modi.contains(KeyModifiers::SHIFT);
         match key {
             KeyCode::Esc => self.should_close = true,
+
+            KeyCode::Char('D') => self.cur.seek_next_measure(&mut self.song, self.s_bwidth),
+            KeyCode::Char('A') => self.cur.seek_prev_measure(&mut self.song, self.s_bwidth),
             KeyCode::Char('d') => self.cur.seek_beat(&mut self.song, 1, self.s_bwidth),
             KeyCode::Char('a') => self.cur.seek_beat(&mut self.song, -1, self.s_bwidth),
-            KeyCode::Char('s') => self.cur.seek_string(&self.song, 1),
-            KeyCode::Char('w') => self.cur.seek_string(&self.song, -1),
+            KeyCode::End => self.cur.seek_end(&self.song, self.s_bwidth),
+            KeyCode::Home => self.cur.seek_start(),
+
+            KeyCode::Right if shift => self.cur.seek_scroll(&mut self.song, 5, self.s_bwidth),
+            KeyCode::Left if shift => self.cur.seek_scroll(&mut self.song, -5, self.s_bwidth),
             KeyCode::Right => self.cur.seek_scroll(&mut self.song, 1, self.s_bwidth),
             KeyCode::Left => self.cur.seek_scroll(&mut self.song, -1, self.s_bwidth),
+
+            KeyCode::Char('s') => self.cur.seek_string(&self.song, 1),
+            KeyCode::Char('w') => self.cur.seek_string(&self.song, -1),
 
             KeyCode::Char('z') => {
                 let res = self.undo();

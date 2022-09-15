@@ -84,6 +84,40 @@ impl Cursor {
         }
         self.beat = new;
         self.scroll_to_cursor(s_bwidth);
+        self.track_mut(song).update_measures();
+    }
+
+    pub fn seek_start(&mut self) {
+        self.beat = 0;
+        self.scroll = 0;
+    }
+
+    pub fn seek_end(&mut self, song: &Song, s_bwidth: usize) {
+        self.beat = self.track(song).beats.len() - 1;
+        self.scroll_to_cursor(s_bwidth);
+    }
+
+    pub fn seek_next_measure(&mut self, song: &Song, s_bwidth: usize) {
+        let l = &self.track(song).measure_i;
+        let m = l.len() - 1;
+        if self.beat < m {
+            self.beat += 1;
+            while self.beat < m && !l[self.beat] {
+                self.beat += 1;
+            }
+        }
+        self.scroll_to_cursor(s_bwidth);
+    }
+
+    pub fn seek_prev_measure(&mut self, song: &Song, s_bwidth: usize) {
+        let l = &self.track(song).measure_i;
+        if self.beat > 0 {
+            self.beat -= 1;
+            while self.beat > 0 && !l[self.beat] {
+                self.beat -= 1;
+            }
+        }
+        self.scroll_to_cursor(s_bwidth);
     }
 
     pub fn scroll_to_cursor(&mut self, s_bwidth: usize) {
