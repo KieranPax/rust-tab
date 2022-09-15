@@ -22,6 +22,8 @@ impl Cursor {
         }
     }
 
+    // Basic song access
+
     pub fn track<'a>(&self, song: &'a Song) -> &'a Track {
         &song.tracks[self.track]
     }
@@ -52,6 +54,8 @@ impl Cursor {
         &mut song.tracks[self.track].beats[self.beat]
     }
 
+    // Clone from song
+
     pub fn clone_beats_slice<'a>(&self, song: &'a Song, count: usize) -> Option<Vec<Beat>> {
         song.tracks[self.track]
             .beats
@@ -71,18 +75,21 @@ impl Cursor {
         song.tracks[self.track].beats[self.beat].copy_note(self.string)
     }
 
+    // Seek cursor
+
     pub fn seek_string(&mut self, song: &Song, dire: i16) {
         let new = self.string as i16 + dire;
         self.string = new.clamp(0, self.track(song).string_count as i16 - 1) as u16;
     }
 
     pub fn seek_beat(&mut self, song: &mut Song, dire: isize, s_bwidth: usize) {
-        let new = (self.beat as isize + dire).max(0) as usize;
-        let beats = self.beats_mut(song);
-        while new >= beats.len() as usize {
-            beats.push(beats.last().unwrap().copy_duration());
+        self.beat = (self.beat as isize + dire).max(0) as usize;
+        if let Some(diff) = (self.beat + 1).checked_sub(self.beats(song).len()) {
+            let beat = self.beats(song).last().unwrap().copy_duration();
+            for _ in 0..diff {
+                self.append_beat(song, beat.clone());
+            }
         }
-        self.beat = new;
         self.scroll_to_cursor(s_bwidth);
         self.track_mut(song).update_measures();
     }
@@ -138,6 +145,8 @@ impl Cursor {
     pub fn cursor_to_scroll(&mut self, s_bwidth: usize) {
         self.beat = self.beat.clamp(self.scroll, self.scroll + s_bwidth - 1);
     }
+
+    // -- Song manipulation
 
     pub fn set_duration(&self, song: &mut Song, dur: Duration) {
         self.beat_mut(song).dur = dur;
@@ -221,5 +230,9 @@ impl Cursor {
         self.beats_mut(song)
             .splice(self.beat..self.beat + src.len(), src);
         self.track_mut(song).update_measures();
+    }
+
+    pub fn append_beat(&self, song: &mut Song, beat: Beat) {
+        self.track_mut(song).beats.push(beat)
     }
 }
