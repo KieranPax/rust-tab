@@ -331,7 +331,7 @@ impl App {
     // Draw functions
 
     fn reset_sdim(&mut self, (w, h): (u16, u16)) {
-        self.s_bwidth = ((w - 1) / 4) as usize;
+        self.s_bwidth = ((w - 4) / 4) as usize;
         self.s_height = h;
     }
 
@@ -361,7 +361,7 @@ impl App {
         for (i, lane) in self.lanes.iter().enumerate() {
             lane.draw(win, self.s_bwidth, &self.song, i == self.curr_lane)?;
         }
-        win.moverel(0, 2)?.print(self.gen_status_msg())?;
+        win.print(self.gen_status_msg())?;
         let dur = std::time::Instant::now().duration_since(t0).as_secs_f32() * 1000.0;
         if self.args.draw_timer {
             win.print(format!("     -> ({dur:.2}ms)"))?;

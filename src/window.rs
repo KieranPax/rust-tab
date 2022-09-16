@@ -24,11 +24,6 @@ impl Window {
         self.queue(crossterm::cursor::MoveTo(x, y))
     }
 
-    pub fn moverel(&mut self, x: u16, y: u16) -> Result<&mut Self> {
-        self.queue(crossterm::cursor::MoveRight(x))?
-            .queue(crossterm::cursor::MoveDown(y))
-    }
-
     pub fn print_styled<D: std::fmt::Display>(
         &mut self,
         content: style::StyledContent<D>,
@@ -43,7 +38,7 @@ impl Window {
     pub fn clear(&mut self) -> Result<&mut Self> {
         self.queue(terminal::Clear(terminal::ClearType::All))
     }
-
+    
     pub fn clear_eoline(&mut self) -> Result<&mut Self> {
         self.queue(terminal::Clear(terminal::ClearType::UntilNewLine))
     }
