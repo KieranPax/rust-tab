@@ -513,6 +513,20 @@ impl App {
             .seek_string(&mut self.song, dire);
     }
 
+    fn cur_next_lane(&mut self) {
+        self.curr_lane += 1;
+        if self.curr_lane == self.lanes.len() {
+            self.curr_lane = 0;
+        }
+    }
+
+    fn cur_prev_lane(&mut self) {
+        if self.curr_lane == 0 {
+            self.curr_lane = self.lanes.len();
+        }
+        self.curr_lane -= 1;
+    }
+
     // Input handling
 
     fn key_press(&mut self, key: KeyCode, modi: KeyModifiers) {
@@ -531,6 +545,8 @@ impl App {
             KeyCode::Left if shift => self.cur_seek_scroll(-5),
             KeyCode::Right => self.cur_seek_scroll(1),
             KeyCode::Left => self.cur_seek_scroll(-1),
+            KeyCode::Down => self.cur_next_lane(),
+            KeyCode::Up => self.cur_prev_lane(),
 
             KeyCode::Char('s') => self.cur_seek_string(1),
             KeyCode::Char('w') => self.cur_seek_string(-1),
