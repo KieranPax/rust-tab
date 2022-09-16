@@ -1,0 +1,74 @@
+use crate::{
+    cursor::Cursor,
+    error::Result,
+    song::{Note, Song},
+    window,
+};
+use crossterm::style::Stylize;
+
+pub struct Lane {
+    pub cur: Cursor,
+}
+
+impl Lane {
+    pub fn new() -> Self {
+        Self { cur: Cursor::new() }
+    }
+
+    fn draw_durations(
+        &self,
+        win: &mut window::Window,
+        range: std::ops::Range<usize>,
+        song: &Song,
+    ) -> Result<()> {
+        let track = self.cur.track(song);
+        win.moveto(0, 0)?;
+        for i in range {
+            win.print("~")?.print(track.beats[i].dur.dur_icon())?;
+        }
+        win.print("~")?.clear_eoline()?;
+        Ok(())
+    }
+
+    fn draw_string(
+        &self,
+        win: &mut window::Window,
+        string: u16,
+        range: std::ops::Range<usize>,
+        song: &Song,
+    ) -> Result<()> {
+        let track = self.cur.track(song);
+        win.moveto(0, string + 1)?;
+        for i in range {
+            win.print(if track.measure_i[i] { "|" } else { "―" })?;
+            let inner = match track.beats[i].get_note(string) {
+                Some(Note::Fret(fret)) if fret > &999 => "###".into(),
+                Some(Note::Fret(fret)) => format!("{: ^3}", fret),
+                Some(Note::X) => " X ".into(),
+                None => "―――".into(),
+            };
+            if self.cur.beat == i {
+                win.print_styled(if self.cur.string == string {
+                    inner.as_str().on_white().black()
+                } else {
+                    inner.as_str().on_grey().black()
+                })?;
+            } else {
+                win.print(inner)?;
+            }
+        }
+        win.print("―")?.clear_eoline()?;
+        Ok(())
+    }
+
+    pub fn draw(&self, win: &mut window::Window, s_bwidth: usize, song: &Song) -> Result<()> {
+        let track = self.cur.track(song);
+        let num_beats = track.beats.len();
+        let range = self.cur.scroll..(self.cur.scroll + s_bwidth).min(num_beats);
+        self.draw_durations(win, range.clone(), song)?;
+        for i in 0..track.string_count {
+            self.draw_string(win, i, range.clone(), song)?;
+        }
+        Ok(())
+    }
+}

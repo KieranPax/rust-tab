@@ -9,6 +9,7 @@ extern crate serde_repr;
 mod app;
 mod buffer;
 mod cursor;
+mod draw;
 mod dur;
 mod error;
 mod history;

@@ -1,6 +1,7 @@
 use crate::{
     buffer::Buffer,
     cursor::Cursor,
+    draw::Lane,
     dur::Duration,
     error::{Error, Result},
     history::{Action, History},
@@ -8,10 +9,7 @@ use crate::{
     window,
 };
 use clap::Parser;
-use crossterm::{
-    event::{self, KeyCode, KeyModifiers},
-    style::Stylize,
-};
+use crossterm::event::{self, KeyCode, KeyModifiers};
 
 #[derive(Parser, Debug)]
 #[clap(name = "rust-tab")]
@@ -22,8 +20,6 @@ struct Args {
     #[clap(short, long, action)]
     draw_timer: bool,
 }
-
-type BeatRange = std::ops::Range<usize>;
 
 enum InpMode {
     None,
@@ -323,16 +319,11 @@ impl App {
         self.set_command_res(res);
     }
 
-    // Drawing util functions
+    // Draw functions
 
     fn reset_sdim(&mut self, (w, h): (u16, u16)) {
         self.s_bwidth = ((w - 1) / 4) as usize;
         self.s_height = h;
-    }
-
-    fn visible_beat_range(&self) -> BeatRange {
-        let num_beats = self.cur.beats(&self.song).len();
-        self.cur.scroll..(self.cur.scroll + self.s_bwidth).min(num_beats)
     }
 
     fn gen_status_msg(&self) -> String {
@@ -355,64 +346,19 @@ impl App {
         self.command_res = format!("{err}");
     }
 
-    // Draw functions
-
-    fn draw_durations(&self, win: &mut window::Window, range: BeatRange) -> Result<()> {
-        let track = self.cur.track(&self.song);
-        win.moveto(0, 0)?;
-        for i in range {
-            win.print("~")?.print(track.beats[i].dur.dur_icon())?;
-        }
-        win.print("~")?.clear_eoline()?;
-        Ok(())
-    }
-
-    fn draw_string(&self, win: &mut window::Window, string: u16, range: BeatRange) -> Result<()> {
-        let track = self.cur.track(&self.song);
-        win.moveto(0, string + 1)?;
-        for i in range {
-            win.print_styled(if track.measure_i[i] {
-                "|".white()
-            } else {
-                "―".grey()
-            })?;
-            let inner = match track.beats[i].get_note(string) {
-                Some(Note::Fret(fret)) if fret > &999 => "###".into(),
-                Some(Note::Fret(fret)) => format!("{: ^3}", fret),
-                Some(Note::X) => " X ".into(),
-                None => "―――".into(),
-            };
-            if self.cur.beat == i {
-                win.print_styled(if self.cur.string == string {
-                    inner.as_str().on_white().black()
-                } else {
-                    inner.as_str().on_grey().black()
-                })?;
-            } else {
-                win.print(inner)?;
-            }
-        }
-        win.print("―")?.clear_eoline()?;
-        Ok(())
-    }
-
     fn draw(&self, win: &mut window::Window) -> Result<()> {
         let t0 = std::time::Instant::now();
-        let track = self.cur.track(&self.song);
         win.moveto(0, 0)?;
-        let range = self.visible_beat_range();
-        self.draw_durations(win, range.clone())?;
-        for i in 0..track.string_count {
-            self.draw_string(win, i, range.clone())?;
+        Lane {
+            cur: self.cur.clone(),
         }
-        win.moveto(0, track.string_count + 2)?
-            .clear_line()?
-            .print(self.gen_status_msg())?;
+        .draw(win, self.s_bwidth, &self.song)?;
+        win.moverel(0, 2)?.print(self.gen_status_msg())?;
         let dur = std::time::Instant::now().duration_since(t0).as_secs_f32() * 1000.0;
         if self.args.draw_timer {
             win.print(format!("     -> ({dur:.2}ms)"))?;
         }
-        win.update()?;
+        win.clear_eoline()?.update()?;
         Ok(())
     }
 
