@@ -93,7 +93,7 @@ impl Track {
         Self {
             string_count: 6,
             beats: vec![Beat::new(Duration::new(1, 1))],
-            measure_i: Vec::new(),
+            measure_i: vec![true],
         }
     }
 

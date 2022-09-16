@@ -111,7 +111,8 @@ pub struct App {
     should_close: bool,
     song_path: Option<String>,
     song: Song,
-    cur: Cursor,
+    lanes: Vec<Lane>,
+    curr_lane: usize,
     input: InpCtrl,
     command_res: String,
     copy_buf: Buffer,
@@ -127,7 +128,8 @@ impl App {
             should_close: false,
             song_path: None,
             song: Song::new(),
-            cur: Cursor::new(),
+            lanes: Vec::new(),
+            curr_lane: 0,
             input: InpCtrl::new(),
             command_res: String::new(),
             copy_buf: Buffer::Empty,
@@ -135,6 +137,10 @@ impl App {
             s_height: 4,
             history: History::new(32),
         })
+    }
+
+    pub fn cursor(&self) -> &Cursor {
+        &self.lanes[self.curr_lane].cur
     }
 
     // History functions
@@ -300,6 +306,9 @@ impl App {
     fn load_file(&mut self, path: String) -> Result<String> {
         if let Ok(data) = std::fs::read_to_string(&path) {
             self.song = serde_json::from_str(data.as_str()).unwrap();
+            for track in self.song.tracks.iter_mut() {
+                track.update_measures();
+            }
             Ok(format!("Loaded {path}"))
         } else {
             Err(Error::InvalidOp(format!("Cannot read file '{path}'")))
@@ -349,10 +358,9 @@ impl App {
     fn draw(&self, win: &mut window::Window) -> Result<()> {
         let t0 = std::time::Instant::now();
         win.moveto(0, 0)?;
-        Lane {
-            cur: self.cur.clone(),
+        for (i, lane) in self.lanes.iter().enumerate() {
+            lane.draw(win, self.s_bwidth, &self.song, i == self.curr_lane)?;
         }
-        .draw(win, self.s_bwidth, &self.song)?;
         win.moverel(0, 2)?.print(self.gen_status_msg())?;
         let dur = std::time::Instant::now().duration_since(t0).as_secs_f32() * 1000.0;
         if self.args.draw_timer {
@@ -366,36 +374,38 @@ impl App {
 
     fn do_set_duration(&mut self, dur: Duration) {
         self.new_action(Action::set_duration(
-            self.cur.clone(),
-            self.cur.beat(&self.song).dur.clone(),
+            self.cursor().clone(),
+            self.cursor().beat(&self.song).dur.clone(),
             dur,
         ));
     }
 
     fn do_set_note(&mut self, note: Option<Note>) {
         self.new_action(Action::set_note(
-            self.cur.clone(),
-            self.cur.beat(&self.song).copy_note(self.cur.string),
+            self.cursor().clone(),
+            self.cursor()
+                .beat(&self.song)
+                .copy_note(self.cursor().string),
             note,
         ));
     }
 
     fn do_copy_note(&mut self) {
-        self.copy_buf = self.cur.copy_note(&mut self.song);
+        self.copy_buf = self.cursor().copy_note(&self.song);
         if matches!(self.copy_buf, Buffer::Note(_)) {
             self.set_command_res(Ok("Copied Note"));
         }
     }
 
     fn do_copy_beat(&mut self) {
-        self.copy_buf = self.cur.copy_beat(&mut self.song);
+        self.copy_buf = self.cursor().copy_beat(&self.song);
         if matches!(self.copy_buf, Buffer::Beat(_)) {
             self.set_command_res(Ok("Copied Beat"));
         }
     }
 
     fn do_copy_beats(&mut self, count: usize) {
-        self.copy_buf = self.cur.copy_beats(&mut self.song, count);
+        self.copy_buf = self.cursor().copy_beats(&self.song, count);
         if let Buffer::Beats(b) = &self.copy_buf {
             let msg = format!("Copied {} beats", b.len());
             self.set_command_res(Ok(msg));
@@ -403,8 +413,8 @@ impl App {
     }
 
     fn do_delete_beats(&mut self, count: usize) {
-        if let Some(b) = self.cur.clone_beats_slice(&self.song, count) {
-            self.new_action(Action::delete_beats(self.cur.clone(), b))
+        if let Some(b) = self.cursor().clone_beats_slice(&self.song, count) {
+            self.new_action(Action::delete_beats(self.cursor().clone(), b))
         } else {
             self.set_command_err(Error::InvalidOp("Tried to delete out of bounds".into()));
         }
@@ -412,14 +422,14 @@ impl App {
 
     fn do_delete_beat(&mut self) {
         self.new_action(Action::delete_beat(
-            self.cur.clone(),
-            self.cur.clone_beat(&self.song),
+            self.cursor().clone(),
+            self.cursor().clone_beat(&self.song),
         ));
     }
 
     fn do_clear_beats(&mut self, count: usize) {
-        if let Some(b) = self.cur.clone_beats_slice(&self.song, count) {
-            self.new_action(Action::clear_beats(self.cur.clone(), b))
+        if let Some(b) = self.cursor().clone_beats_slice(&self.song, count) {
+            self.new_action(Action::clear_beats(self.cursor().clone(), b))
         } else {
             self.set_command_err(Error::InvalidOp("Tried to delete out of bounds".into()));
         }
@@ -427,31 +437,31 @@ impl App {
 
     fn do_clear_beat(&mut self) {
         self.new_action(Action::clear_beat(
-            self.cur.clone(),
-            self.cur.clone_chord(&self.song),
+            self.cursor().clone(),
+            self.cursor().clone_chord(&self.song),
         ));
     }
 
     fn do_paste(&mut self, in_place: bool) {
         match self.copy_buf.clone() {
             Buffer::Note(note) => self.new_action(Action::paste_note(
-                self.cur.clone(),
-                self.cur.clone_note(&self.song),
+                self.cursor().clone(),
+                self.cursor().clone_note(&self.song),
                 note,
             )),
             Buffer::Beat(beat) => self.new_action(Action::paste_beat(
-                self.cur.clone(),
+                self.cursor().clone(),
                 if in_place {
-                    Some(self.cur.clone_beat(&self.song))
+                    Some(self.cursor().clone_beat(&self.song))
                 } else {
                     None
                 },
                 beat,
             )),
             Buffer::Beats(beats) => self.new_action(Action::paste_beats(
-                self.cur.clone(),
+                self.cursor().clone(),
                 if in_place {
-                    Some(self.cur.clone_beat(&self.song))
+                    Some(self.cursor().clone_beat(&self.song))
                 } else {
                     None
                 },
@@ -461,6 +471,48 @@ impl App {
         }
     }
 
+    // Cursor functions
+
+    fn cur_seek_beat(&mut self, dire: isize) {
+        self.lanes[self.curr_lane]
+            .cur
+            .seek_beat(&mut self.song, dire, self.s_bwidth);
+    }
+
+    fn cur_seek_next_measure(&mut self) {
+        self.lanes[self.curr_lane]
+            .cur
+            .seek_next_measure(&self.song, self.s_bwidth);
+    }
+
+    fn cur_seek_prev_measure(&mut self) {
+        self.lanes[self.curr_lane]
+            .cur
+            .seek_prev_measure(&self.song, self.s_bwidth);
+    }
+
+    fn cur_seek_end(&mut self) {
+        self.lanes[self.curr_lane]
+            .cur
+            .seek_end(&self.song, self.s_bwidth);
+    }
+
+    fn cur_seek_start(&mut self) {
+        self.lanes[self.curr_lane].cur.seek_start();
+    }
+
+    fn cur_seek_scroll(&mut self, dire: isize) {
+        self.lanes[self.curr_lane]
+            .cur
+            .seek_scroll(&mut self.song, dire, self.s_bwidth);
+    }
+
+    fn cur_seek_string(&mut self, dire: i16) {
+        self.lanes[self.curr_lane]
+            .cur
+            .seek_string(&mut self.song, dire);
+    }
+
     // Input handling
 
     fn key_press(&mut self, key: KeyCode, modi: KeyModifiers) {
@@ -468,21 +520,20 @@ impl App {
         match key {
             KeyCode::Esc => self.should_close = true,
 
-            KeyCode::Char('D') => self.cur.seek_next_measure(&mut self.song, self.s_bwidth),
-            KeyCode::Char('A') => self.cur.seek_prev_measure(&mut self.song, self.s_bwidth),
-            KeyCode::Char('d') => self.cur.seek_beat(&mut self.song, 1, self.s_bwidth),
-            KeyCode::Char('a') => self.cur.seek_beat(&mut self.song, -1, self.s_bwidth),
-            KeyCode::End => self.cur.seek_end(&self.song, self.s_bwidth),
-            KeyCode::Home => self.cur.seek_start(),
+            KeyCode::Char('D') => self.cur_seek_next_measure(),
+            KeyCode::Char('A') => self.cur_seek_prev_measure(),
+            KeyCode::Char('d') => self.cur_seek_beat(1),
+            KeyCode::Char('a') => self.cur_seek_beat(-1),
+            KeyCode::End => self.cur_seek_end(),
+            KeyCode::Home => self.cur_seek_start(),
 
-            KeyCode::Right if shift => self.cur.seek_scroll(&mut self.song, 5, self.s_bwidth),
-            KeyCode::Left if shift => self.cur.seek_scroll(&mut self.song, -5, self.s_bwidth),
-            KeyCode::Right => self.cur.seek_scroll(&mut self.song, 1, self.s_bwidth),
-            KeyCode::Left => self.cur.seek_scroll(&mut self.song, -1, self.s_bwidth),
+            KeyCode::Right if shift => self.cur_seek_scroll(5),
+            KeyCode::Left if shift => self.cur_seek_scroll(-5),
+            KeyCode::Right => self.cur_seek_scroll(1),
+            KeyCode::Left => self.cur_seek_scroll(-1),
 
-            KeyCode::Char('s') => self.cur.seek_string(&self.song, 1),
-            KeyCode::Char('w') => self.cur.seek_string(&self.song, -1),
-
+            KeyCode::Char('s') => self.cur_seek_string(1),
+            KeyCode::Char('w') => self.cur_seek_string(-1),
             KeyCode::Char('z') => {
                 let res = self.undo();
                 self.set_command_res(res);
@@ -549,7 +600,7 @@ impl App {
                     KeyCode::Enter => self.input_duration(),
                     KeyCode::Char('l') => {
                         self.input_duration();
-                        self.cur.seek_beat(&mut self.song, 1, self.s_bwidth);
+                        self.cur_seek_beat(1);
                         self.input.mode = InpMode::Duration;
                     }
                     _ => {}
@@ -558,7 +609,7 @@ impl App {
                     KeyCode::Enter => self.input_edit(),
                     KeyCode::Char('e') => {
                         self.input_edit();
-                        self.cur.seek_beat(&mut self.song, 1, self.s_bwidth);
+                        self.cur_seek_beat(1);
                         self.input.mode = InpMode::Edit;
                     }
                     _ => {}
@@ -635,7 +686,8 @@ impl App {
         win.clear()?;
         self.reset_sdim(crossterm::terminal::size().unwrap());
         let mut do_redraw = true;
-        self.cur.track_mut(&mut self.song).update_measures();
+        self.lanes.push(Lane::new());
+        self.lanes.push(Lane::new_t(1));
         while !self.should_close {
             if do_redraw {
                 self.draw(&mut win)?;
