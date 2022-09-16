@@ -11,8 +11,9 @@ pub enum Note {
     X,
 }
 
-impl Note {
-    pub fn parse(s: &str) -> Result<Self> {
+impl std::str::FromStr for Note {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
         if s == "x" {
             Ok(Self::X)
         } else if let Ok(fret) = s.parse() {

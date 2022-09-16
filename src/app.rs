@@ -48,6 +48,10 @@ impl InpCtrl {
         }
     }
 
+    fn push(&mut self, ch: char) {
+        self.arg.push(ch);
+    }
+
     fn clear(&mut self) {
         self.mode = InpMode::None;
         self.arg.clear();
@@ -87,8 +91,22 @@ impl InpCtrl {
         }
     }
 
-    fn parse_arg<T: std::str::FromStr>(&self) -> Option<T> {
-        self.arg.parse().ok()
+    fn arg_clear(&mut self) -> String {
+        let temp = self.arg.clone();
+        self.clear();
+        temp
+    }
+
+    fn parse_arg_clear<T: std::str::FromStr<Err = Error>>(&mut self) -> Result<T> {
+        let temp = self.arg.parse();
+        self.clear();
+        temp
+    }
+
+    fn parse_arg_opt_clear<T: std::str::FromStr>(&mut self) -> Option<T> {
+        let temp = self.arg.parse().ok();
+        self.clear();
+        temp
     }
 }
 
@@ -545,28 +563,25 @@ impl App {
     }
 
     fn input_duration(&mut self) {
-        if !self.input.arg.is_empty() {
-            match Duration::parse(&self.input.arg) {
-                Ok(dur) => self.do_set_duration(dur),
-                Err(e) => self.set_command_err(e),
-            };
-            self.input.clear();
-        }
+        match self.input.parse_arg_clear() {
+            Ok(dur) => self.do_set_duration(dur),
+            Err(e) => self.set_command_err(e),
+        };
     }
 
     fn input_edit(&mut self) {
-        match Note::parse(&self.input.arg) {
+        match self.input.parse_arg_clear() {
             Ok(note) => self.do_set_note(Some(note)),
             Err(e) => self.set_command_err(e),
         }
-        self.input.clear();
     }
 
     fn input_command(&mut self) {
-        let cmd = if let Some((a, b)) = self.input.arg.split_once(' ') {
+        let arg = self.input.arg_clear();
+        let cmd = if let Some((a, b)) = arg.split_once(' ') {
             (a, Some(b))
         } else {
-            (self.input.arg.as_str(), None)
+            (arg.as_str(), None)
         };
         match cmd {
             ("save", Some(path)) => {
@@ -576,14 +591,13 @@ impl App {
             ("save", None) => self.do_save_file(None),
             _ => {}
         }
-        self.input.clear();
     }
 
     fn key_input(&mut self, key: KeyCode) {
         match &key {
             KeyCode::Esc => self.input.clear(),
             KeyCode::Backspace => self.input.backspace(),
-            KeyCode::Char(ch) if self.input.char_valid(ch) => self.input.arg.push(ch.to_owned()),
+            KeyCode::Char(ch) if self.input.char_valid(ch) => self.input.push(ch.to_owned()),
             _ => match self.input.mode {
                 InpMode::Duration => match key {
                     KeyCode::Enter => self.input_duration(),
@@ -615,27 +629,18 @@ impl App {
                     _ => {}
                 },
                 InpMode::Beat => match key {
-                    KeyCode::Char('c') => {
-                        match self.input.parse_arg() {
-                            Some(n) => self.do_copy_beats(n),
-                            None => self.do_copy_beat(),
-                        }
-                        self.input.clear();
-                    }
-                    KeyCode::Char('x') => {
-                        match self.input.parse_arg() {
-                            Some(n) => self.do_delete_beats(n),
-                            None => self.do_delete_beat(),
-                        }
-                        self.input.clear();
-                    }
-                    KeyCode::Char('k') => {
-                        match self.input.parse_arg::<usize>() {
-                            Some(n) => self.do_clear_beats(n),
-                            None => self.do_clear_beat(),
-                        }
-                        self.input.clear();
-                    }
+                    KeyCode::Char('c') => match self.input.parse_arg_opt_clear() {
+                        Some(n) => self.do_copy_beats(n),
+                        None => self.do_copy_beat(),
+                    },
+                    KeyCode::Char('x') => match self.input.parse_arg_opt_clear() {
+                        Some(n) => self.do_delete_beats(n),
+                        None => self.do_delete_beat(),
+                    },
+                    KeyCode::Char('k') => match self.input.parse_arg_opt_clear::<usize>() {
+                        Some(n) => self.do_clear_beats(n),
+                        None => self.do_clear_beat(),
+                    },
                     _ => {}
                 },
                 InpMode::Command => match key {

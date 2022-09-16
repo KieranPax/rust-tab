@@ -69,8 +69,11 @@ impl Duration {
             _ => " ? ",
         }
     }
+}
 
-    pub fn parse(s: &str) -> Result<Self> {
+impl std::str::FromStr for Duration {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
         lazy_static::lazy_static! {
             static ref RE: Regex = Regex::new(r"^(?:(\d+)/|)(\d+)(\.|)(?::(\d+)|)$").unwrap();
         }
