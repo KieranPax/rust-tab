@@ -3,6 +3,7 @@ pub enum Error {
     IOError(std::io::Error),
     NoEvent,
     FileError(String),
+    ParseError(String),
     InvalidOp(String),
 }
 
@@ -12,6 +13,7 @@ impl std::fmt::Display for Error {
             Self::IOError(arg0) => write!(f, "IOError({arg0:?})"),
             Self::NoEvent => write!(f, "NoEvent"),
             Self::FileError(arg0) => write!(f, "FileError({arg0})"),
+            Self::ParseError(arg0) => write!(f, "ParseError({arg0})"),
             Self::InvalidOp(arg0) => write!(f, "InvalidOp({arg0})"),
         }
     }

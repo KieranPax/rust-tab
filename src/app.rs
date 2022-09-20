@@ -155,7 +155,7 @@ impl App {
         match &*action {
             Action::SetDuration { cur, new, .. } => {
                 cur.set_duration(&mut self.song, *new);
-                Ok(format!("Set duration {}/{}", new.num(), new.dem()))
+                Ok(format!("Set duration {}/{}", new.0, new.1))
             }
             Action::SetNote { cur, new, .. } => {
                 if let Some(note) = new {
