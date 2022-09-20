@@ -146,6 +146,31 @@ impl Cursor {
         self.beat = self.beat.clamp(self.scroll, self.scroll + s_bwidth - 1);
     }
 
+    // -- Cursor syncronisation
+
+    pub fn calc_duration(&self, song: &Song) -> Duration {
+        let mut sum = Duration::new(0, 1);
+        for (i, beat) in self.beats(song).iter().enumerate() {
+            if i == self.beat {
+                return sum;
+            }
+            sum = sum + beat.dur;
+        }
+        sum
+    }
+
+    pub fn transfer_seek(&mut self, dur: Duration, song: &Song, s_bwidth: usize) {
+        let mut sum = Duration::new(0, 1);
+        for (i, beat) in self.beats(song).iter().enumerate() {
+            sum = sum + beat.dur;
+            if sum > dur {
+                self.beat = i;
+                self.scroll_to_cursor(s_bwidth);
+                return;
+            }
+        }
+    }
+
     // -- Song manipulation
 
     pub fn set_duration(&self, song: &mut Song, dur: Duration) {

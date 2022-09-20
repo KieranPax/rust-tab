@@ -463,38 +463,53 @@ impl App {
 
     // Cursor functions
 
+    fn sync_cursors(&mut self) {
+        let dur = self.lanes[self.curr_lane].cur.calc_duration(&self.song);
+        for (i, lane) in self.lanes.iter_mut().enumerate() {
+            if i != self.curr_lane {
+                lane.cur.transfer_seek(dur, &self.song, self.s_bwidth);
+            }
+        }
+    }
+
     fn cur_seek_beat(&mut self, dire: isize) {
         self.lanes[self.curr_lane]
             .cur
             .seek_beat(&mut self.song, dire, self.s_bwidth);
+        self.sync_cursors();
     }
 
     fn cur_seek_next_measure(&mut self) {
         self.lanes[self.curr_lane]
             .cur
             .seek_next_measure(&self.song, self.s_bwidth);
+        self.sync_cursors();
     }
 
     fn cur_seek_prev_measure(&mut self) {
         self.lanes[self.curr_lane]
             .cur
             .seek_prev_measure(&self.song, self.s_bwidth);
+        self.sync_cursors();
     }
 
     fn cur_seek_end(&mut self) {
         self.lanes[self.curr_lane]
             .cur
             .seek_end(&self.song, self.s_bwidth);
+        self.sync_cursors();
     }
 
     fn cur_seek_start(&mut self) {
         self.lanes[self.curr_lane].cur.seek_start();
+        self.sync_cursors();
     }
 
     fn cur_seek_scroll(&mut self, dire: isize) {
         self.lanes[self.curr_lane]
             .cur
             .seek_scroll(&mut self.song, dire, self.s_bwidth);
+        self.sync_cursors();
     }
 
     fn cur_seek_string(&mut self, dire: i16) {
