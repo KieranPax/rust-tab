@@ -31,7 +31,7 @@ impl Lane {
         for i in range {
             win.print("~")?.print(track.beats[i].dur.dur_icon())?;
         }
-        win.print("~\n")?;
+        win.print("~")?.next_line()?;
         Ok(())
     }
 
@@ -62,7 +62,7 @@ impl Lane {
                 win.print(inner)?;
             }
         }
-        win.print("―\n")?;
+        win.print("―")?.next_line()?;
         Ok(())
     }
 
@@ -80,7 +80,7 @@ impl Lane {
         for i in 0..track.string_count {
             self.draw_string(win, i, range.clone(), song, is_curr)?;
         }
-        win.print("\n")?;
+        win.next_line()?;
         Ok(())
     }
 }

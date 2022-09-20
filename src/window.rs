@@ -38,9 +38,14 @@ impl Window {
     pub fn clear(&mut self) -> Result<&mut Self> {
         self.queue(terminal::Clear(terminal::ClearType::All))
     }
-    
+
     pub fn clear_eoline(&mut self) -> Result<&mut Self> {
         self.queue(terminal::Clear(terminal::ClearType::UntilNewLine))
+    }
+
+    pub fn next_line(&mut self) -> Result<&mut Self> {
+        self.queue(terminal::Clear(terminal::ClearType::UntilNewLine))?
+            .queue(crossterm::cursor::MoveToNextLine(1))
     }
 
     pub fn queue<C>(&mut self, command: C) -> Result<&mut Self>
