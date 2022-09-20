@@ -7,6 +7,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate serde_repr;
 mod app;
+mod args;
 mod buffer;
 mod cursor;
 mod draw;

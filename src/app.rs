@@ -1,4 +1,5 @@
 use crate::{
+    args,
     buffer::Buffer,
     cursor::Cursor,
     draw::Lane,
@@ -8,18 +9,7 @@ use crate::{
     song::{Note, Song},
     window,
 };
-use clap::Parser;
 use crossterm::event::{self, KeyCode, KeyModifiers};
-
-#[derive(Parser, Debug)]
-#[clap(name = "rust-tab")]
-#[clap(version, about, long_about = None)]
-struct Args {
-    #[clap(value_parser)]
-    path: Option<String>,
-    #[clap(short, long, action)]
-    draw_timer: bool,
-}
 
 enum InpMode {
     None,
@@ -107,7 +97,7 @@ impl InpCtrl {
 }
 
 pub struct App {
-    args: Args,
+    args: args::Args,
     should_close: bool,
     song_path: Option<String>,
     song: Song,
@@ -124,7 +114,7 @@ pub struct App {
 impl App {
     pub fn new() -> Result<Self> {
         Ok(Self {
-            args: Args::parse(),
+            args: clap::Parser::parse(),
             should_close: false,
             song_path: None,
             song: Song::new(),
